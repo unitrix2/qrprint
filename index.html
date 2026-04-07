@@ -8,23 +8,12 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* Animations */
         tr { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        #drop-zone.drag-over {
-            background-color: #dbeafe !important;
-            border-color: #3b82f6 !important;
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .drag-over { background-color: #dbeafe !important; border-color: #3b82f6 !important; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans">
@@ -32,36 +21,30 @@
     <nav class="bg-white shadow-sm py-4 px-8 flex justify-between items-start sticky top-0 z-50">
         <div class="flex flex-col">
             <h1 class="text-2xl font-bold text-blue-600">QR<span class="text-slate-800">Extractor</span></h1>
-            
             <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
                 <span class="mr-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping"></span>
                 Created by: Salman
             </div>
         </div>
-
         <div class="space-x-4 mt-2">
             <button onclick="location.reload()" class="text-slate-500 hover:text-red-600 font-medium transition-colors">Reset</button>
         </div>
     </nav>
 
     <main class="max-w-6xl mx-auto p-6">
-        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-100 transition-all hover:shadow-2xl">
-            <div id="drop-zone" class="border-2 border-dashed border-blue-200 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 bg-blue-50/30 transition-colors">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-100">
+            <label for="file-input" id="drop-zone" class="block border-2 border-dashed border-blue-200 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 bg-blue-50/30 transition-all">
                 <input type="file" id="file-input" multiple accept="image/*" class="hidden">
                 <div class="text-5xl mb-4">📂</div>
                 <h2 class="text-xl font-semibold text-slate-700">Browse photos or Drag & Drop</h2>
-                <p class="text-slate-500 mt-2">Select multiple QR code images to process</p>
-                <p class="text-xs text-slate-400 mt-3 font-mono">Formats supported: ABC_123-456 or ABC-123-456</p>
-            </div>
+                <p class="text-slate-500 mt-2">Yahan click karke photos select karein</p>
+                <p class="text-xs text-slate-400 mt-3 font-mono">Format: ABC_123-456 or ABC-123-456</p>
+            </label>
         </div>
 
         <div id="actions" class="hidden flex gap-4 mb-6">
-            <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
-                📥 Export to Excel
-            </button>
-            <button id="export-csv" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
-                📄 Export to CSV
-            </button>
+            <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-transform active:scale-95">📥 Export to Excel</button>
+            <button id="export-csv" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-transform active:scale-95">📄 Export to CSV</button>
         </div>
 
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
@@ -77,8 +60,7 @@
                             <th class="p-4 uppercase text-xs font-bold tracking-wider">Link</th>
                         </tr>
                     </thead>
-                    <tbody id="data-body" class="divide-y divide-slate-100">
-                        </tbody>
+                    <tbody id="data-body" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
         </div>
@@ -92,16 +74,19 @@
 
         let tableData = [];
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        // Drag & Drop Handlers
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('drag-over');
-            processFiles(e.dataTransfer.files);
+            if (e.dataTransfer.files.length) processFiles(e.dataTransfer.files);
         });
 
-        fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+        // File Selection Handler
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) processFiles(e.target.files);
+        });
 
         async function processFiles(files) {
             for (let i = 0; i < files.length; i++) {
@@ -127,9 +112,11 @@
                         const ctx = canvas.getContext('2d');
                         canvas.width = img.width; canvas.height = img.height;
                         ctx.drawImage(img, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, imageData.height);
-                        resolve(code ? code.data : null);
+                        try {
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const code = jsQR(imageData.data, imageData.width, imageData.height);
+                            resolve(code ? code.data : null);
+                        } catch (e) { resolve(null); }
                     };
                     img.src = e.target.result;
                 };
@@ -138,29 +125,18 @@
         }
 
         function parseData(link, fileName, index) {
-            // CODE: Last 6 digits after '='
             const code = link.includes('=') ? link.split('=').pop().substring(0, 6) : "N/A";
-
-            // Improved FE_No Logic: Handle both ABC_123-456 and ABC-123-456
             let feNo = "N/A";
-            const nameWithoutExt = fileName.split('.')[0]; // Remove .jpg, .png etc.
-            
-            // Regex to find 3 digits, then a dash, then 3 digits at the end
+            const nameWithoutExt = fileName.split('.')[0];
             const match = nameWithoutExt.match(/(\d{3})[-](\d{3})$/);
-            
             if (match) {
-                feNo = ${match[1]}/${match[2]}; // Joins as 123/456
+                feNo = `${match[1]}/${match[2]}`;
             } else if (nameWithoutExt.includes('_')) {
-                // Fallback for underscore format
                 const parts = nameWithoutExt.split('_');
-                const lastPart = parts[parts.length - 1]; // 123-456
-                feNo = lastPart.replace('-', '/');
+                feNo = parts[parts.length - 1].replace('-', '/');
             }
-
             const depot = "CDO/CNB-";
-            const caption = depot + feNo;
-
-            return { srNo: index, code: code, feNo: feNo, depot: depot, caption: caption, link: link };
+            return { srNo: index, code, feNo, depot, caption: depot + feNo, link };
         }
 
         function renderRow(row) {
@@ -183,7 +159,7 @@
             })));
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Data");
-            XLSX.writeFile(wb, QR_Export_${Date.now()}.xlsx);
+            XLSX.writeFile(wb, `QR_Export_${Date.now()}.xlsx`);
         });
 
         document.getElementById('export-csv').addEventListener('click', () => {
@@ -192,7 +168,7 @@
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = QR_Export_${Date.now()}.csv;
+            link.download = `QR_Export_${Date.now()}.csv`;
             link.click();
         });
     </script>
