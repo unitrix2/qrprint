@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR to Excel Pro - Created by Salman</title>
+    <title>QR to Excel Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    
     <style>
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
@@ -15,82 +14,72 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Row Fade-in Animation */
-        tr { animation: fadeIn 0.4s ease-out forwards; }
+        /* Animations */
+        tr { animation: fadeIn 0.5s ease-out forwards; }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .drag-over {
-            background-color: #eff6ff !important;
+        #drop-zone.drag-over {
+            background-color: #dbeafe !important;
             border-color: #3b82f6 !important;
-            transform: scale(1.01);
         }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+<body class="bg-slate-50 min-h-screen font-sans">
 
-    <nav class="bg-white shadow-sm py-5 px-8 flex justify-between items-start sticky top-0 z-50">
+    <nav class="bg-white shadow-sm py-4 px-8 flex justify-between items-start sticky top-0 z-50">
         <div class="flex flex-col">
-            <h1 class="text-2xl font-bold text-blue-600 tracking-tight">QR<span class="text-slate-800">Extractor</span></h1>
-            <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 shadow-sm w-fit">
-                <span class="mr-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <h1 class="text-2xl font-bold text-blue-600">QR<span class="text-slate-800">Extractor</span></h1>
+            
+            <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
+                <span class="mr-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping"></span>
                 Created by: Salman
             </div>
         </div>
 
-        <div class="flex gap-3">
-            <button onclick="location.reload()" class="px-4 py-2 text-sm font-medium text-slate-500 hover:text-red-500 transition-colors">
-                Reset All
-            </button>
+        <div class="space-x-4 mt-2">
+            <button onclick="location.reload()" class="text-slate-500 hover:text-red-600 font-medium transition-colors">Reset</button>
         </div>
     </nav>
 
-    <main class="max-w-6xl mx-auto p-6 md:p-10">
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 mb-8">
-            <div id="drop-zone" class="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400 hover:bg-slate-50 transition-all duration-300">
+    <main class="max-w-6xl mx-auto p-6">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-100 transition-all hover:shadow-2xl">
+            <div id="drop-zone" class="border-2 border-dashed border-blue-200 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 bg-blue-50/30 transition-colors">
                 <input type="file" id="file-input" multiple accept="image/*" class="hidden">
-                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                </div>
-                <h2 class="text-xl font-bold text-slate-700">Select QR Code Photos</h2>
-                <p class="text-slate-500 mt-1">Drag and drop multiple images or click to browse</p>
-                <p class="text-xs text-slate-400 mt-4 italic">Supported: JPG, PNG, WEBP</p>
+                <div class="text-5xl mb-4">📂</div>
+                <h2 class="text-xl font-semibold text-slate-700">Browse photos or Drag & Drop</h2>
+                <p class="text-slate-500 mt-2">Select multiple QR code images to process</p>
+                <p class="text-xs text-slate-400 mt-3 font-mono">Formats supported: ABC_123-456 or ABC-123-456</p>
             </div>
         </div>
 
-        <div id="actions" class="hidden flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-            <h3 class="text-lg font-semibold text-slate-800">Scanned Results (<span id="count">0</span>)</h3>
-            <div class="flex gap-3">
-                <button id="export-csv" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg font-semibold transition-all flex items-center gap-2">
-                    📄 Export CSV
-                </button>
-                <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md shadow-green-200 transition-all flex items-center gap-2">
-                    📥 Download Excel
-                </button>
-            </div>
+        <div id="actions" class="hidden flex gap-4 mb-6">
+            <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
+                📥 Export to Excel
+            </button>
+            <button id="export-csv" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
+                📄 Export to CSV
+            </button>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
             <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead class="bg-slate-50 border-b border-slate-100">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-800 text-white">
                         <tr>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sr No</th>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">CODE</th>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">FE_No</th>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Depot</th>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Caption</th>
-                            <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Link</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Sr No</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">CODE</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">FE_No</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Depot</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Caption</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Link</th>
                         </tr>
                     </thead>
-                    <tbody id="data-body" class="divide-y divide-slate-50 text-sm">
+                    <tbody id="data-body" class="divide-y divide-slate-100">
                         </tbody>
                 </table>
-            </div>
-            <div id="empty-state" class="p-20 text-center">
-                <p class="text-slate-400">No images processed yet.</p>
             </div>
         </div>
     </main>
@@ -100,12 +89,9 @@
         const dropZone = document.getElementById('drop-zone');
         const dataBody = document.getElementById('data-body');
         const actionButtons = document.getElementById('actions');
-        const emptyState = document.getElementById('empty-state');
-        const countDisplay = document.getElementById('count');
 
         let tableData = [];
 
-        // UI Event Listeners
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -117,12 +103,10 @@
 
         fileInput.addEventListener('change', (e) => processFiles(e.target.files));
 
-        // Logic: File Processing
         async function processFiles(files) {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 if (!file.type.startsWith('image/')) continue;
-
                 const qrData = await readQRCode(file);
                 if (qrData) {
                     const processedRow = parseData(qrData, file.name, tableData.length + 1);
@@ -130,18 +114,9 @@
                     renderRow(processedRow);
                 }
             }
-            updateUI();
+            if (tableData.length > 0) actionButtons.classList.remove('hidden');
         }
 
-        function updateUI() {
-            if (tableData.length > 0) {
-                actionButtons.classList.remove('hidden');
-                emptyState.classList.add('hidden');
-                countDisplay.innerText = tableData.length;
-            }
-        }
-
-        // Logic: QR Scanning
         function readQRCode(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -150,8 +125,7 @@
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
+                        canvas.width = img.width; canvas.height = img.height;
                         ctx.drawImage(img, 0, 0);
                         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const code = jsQR(imageData.data, imageData.width, imageData.height);
@@ -163,71 +137,62 @@
             });
         }
 
-        // Logic: Data Extraction (Aapki Requirements ke mutabik)
         function parseData(link, fileName, index) {
-            // 1. CODE: Last 6 characters after '='
-            const code = link.includes('=') ? link.split('=').pop().slice(0, 6) : "N/A";
+            // CODE: Last 6 digits after '='
+            const code = link.includes('=') ? link.split('=').pop().substring(0, 6) : "N/A";
 
-            // 2. FE_No: ABCDEF_123-456 -> 123/456
+            // Improved FE_No Logic: Handle both ABC_123-456 and ABC-123-456
             let feNo = "N/A";
-            if (fileName.includes('_')) {
-                const partAfterUnderscore = fileName.split('_')[1]; // e.g. 123-456.jpg
-                const baseName = partAfterUnderscore.split('.')[0]; // e.g. 123-456
-                feNo = baseName.replace('-', '/'); 
+            const nameWithoutExt = fileName.split('.')[0]; // Remove .jpg, .png etc.
+            
+            // Regex to find 3 digits, then a dash, then 3 digits at the end
+            const match = nameWithoutExt.match(/(\d{3})[-](\d{3})$/);
+            
+            if (match) {
+                feNo = ${match[1]}/${match[2]}; // Joins as 123/456
+            } else if (nameWithoutExt.includes('_')) {
+                // Fallback for underscore format
+                const parts = nameWithoutExt.split('_');
+                const lastPart = parts[parts.length - 1]; // 123-456
+                feNo = lastPart.replace('-', '/');
             }
 
             const depot = "CDO/CNB-";
             const caption = depot + feNo;
 
-            return {
-                srNo: index,
-                code: code,
-                feNo: feNo,
-                depot: depot,
-                caption: caption,
-                link: link
-            };
+            return { srNo: index, code: code, feNo: feNo, depot: depot, caption: caption, link: link };
         }
 
         function renderRow(row) {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-slate-50 transition-colors bg-white";
             tr.innerHTML = `
-                <td class="p-4 text-slate-500 font-medium">${row.srNo}</td>
-                <td class="p-4 font-mono text-blue-600 font-bold bg-blue-50/50">${row.code}</td>
-                <td class="p-4 font-medium text-slate-700">${row.feNo}</td>
-                <td class="p-4 text-slate-600">${row.depot}</td>
+                <td class="p-4 text-slate-600">${row.srNo}</td>
+                <td class="p-4 font-mono text-blue-600 font-bold">${row.code}</td>
+                <td class="p-4 text-slate-700">${row.feNo}</td>
+                <td class="p-4 text-slate-700">${row.depot}</td>
                 <td class="p-4 font-bold text-slate-900">${row.caption}</td>
-                <td class="p-4 text-xs text-slate-400 truncate max-w-[200px]" title="${row.link}">${row.link}</td>
+                <td class="p-4 text-xs text-slate-400 truncate max-w-xs" title="${row.link}">${row.link}</td>
             `;
             dataBody.appendChild(tr);
         }
 
-        // Logic: Excel Export
         document.getElementById('export-excel').addEventListener('click', () => {
-            const worksheetData = tableData.map(item => ({
-                "Sr No": item.srNo,
-                "CODE": item.code,
-                "FE_No": item.feNo,
-                "Depot": item.depot,
-                "Caption": item.caption,
-                "Link": item.link
-            }));
-            
-            const ws = XLSX.utils.json_to_sheet(worksheetData);
+            const ws = XLSX.utils.json_to_sheet(tableData.map(item => ({
+                "Sr No": item.srNo, "CODE": item.code, "FE_No": item.feNo, "Depot": item.depot, "Caption": item.caption, "Link": item.link
+            })));
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "QR Scan Data");
-            XLSX.writeFile(wb, `QR_Report_${new Date().getTime()}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+            XLSX.writeFile(wb, QR_Export_${Date.now()}.xlsx);
         });
 
-        // Logic: CSV Export
         document.getElementById('export-csv').addEventListener('click', () => {
             const ws = XLSX.utils.json_to_sheet(tableData);
             const csv = XLSX.utils.sheet_to_csv(ws);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `QR_Report_${new Date().getTime()}.csv`;
+            link.download = QR_Export_${Date.now()}.csv;
             link.click();
         });
     </script>
