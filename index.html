@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR to Excel Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+
+    <nav class="bg-white shadow-sm py-4 px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-600">QR<span class="text-slate-800">Extractor</span></h1>
+        <div class="space-x-4">
+            <button onclick="location.reload()" class="text-slate-500 hover:text-blue-600">Reset</button>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-6">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-100 transition-all hover:shadow-2xl">
+            <div id="drop-zone" class="border-2 border-dashed border-blue-200 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 bg-blue-50/30 transition-colors">
+                <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                <div class="text-5xl mb-4">📂</div>
+                <h2 class="text-xl font-semibold text-slate-700">Browse photos or Drag & Drop</h2>
+                <p class="text-slate-500 mt-2">Select multiple QR code images to process</p>
+            </div>
+        </div>
+
+        <div id="actions" class="hidden flex gap-4 mb-6">
+            <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
+                📥 Export to Excel
+            </button>
+            <button id="export-csv" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium flex items-center shadow-lg transition-transform active:scale-95">
+                📄 Export to CSV
+            </button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-800 text-white">
+                        <tr>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Sr No</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">CODE</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">FE_No</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Depot</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Caption</th>
+                            <th class="p-4 uppercase text-xs font-bold tracking-wider">Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-body" class="divide-y divide-slate-100">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
