@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Extractor & Designer Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .drag-over { background-color: #dbeafe !important; border-color: #3b82f6 !important; }
+        
+        /* Heading Effects */
+        th { 
+            text-transform: uppercase; 
+            font-size: 0.75rem; 
+            letter-spacing: 0.05em; 
+            font-weight: 700;
+        }
+
+        .label-container {
+            width: 280px;
+            aspect-ratio: 75 / 100;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border-style: solid;
+            border-color: #000000;
+        }
+        
+        #designer-overlay { display: none; backdrop-filter: blur(10px); }
+        .qr-wrapper img, .qr-wrapper canvas { width: 100% !important; height: auto !important; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+
+    <nav class="bg-white shadow-sm py-4 px-8 flex justify-between items-start sticky top-0 z-50">
+        <div class="flex flex-col">
+            <h1 class="text-2xl font-bold text-blue-600">QR<span class="text-slate-800">Extractor</span></h1>
+            <div class="mt-2 inline-flex items-center px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm w-fit">
+                <span class="mr-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping"></span>
+                Created by: abc
+            </div>
+        </div>
+        <div class="flex gap-4 mt-2">
+            <button onclick="openDesigner()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all shadow-md">🎨 Label Designer</button>
+            <button onclick="location.reload()" class="text-slate-500 hover:text-red-600 font-medium pt-2">Reset</button>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-6">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-slate-100 text-center">
+            <label for="file-input" id="drop-zone" class="block border-2 border-dashed border-blue-200 rounded-xl p-10 cursor-pointer hover:border-blue-400 bg-blue-50/30 transition-all">
+                <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                <div class="text-5xl mb-4">📂</div>
+                <h2 class="text-xl font-semibold text-slate-700">Browse photos or Drag & Drop</h2>
+            </label>
+        </div>
+
+        <div id="actions" class="hidden mb-6">
+            <button id="export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-transform active:scale-95">📥 Export Excel</button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-800 text-white">
+                        <tr>
+                            <th class="p-4">Sr No</th>
+                            <th class="p-4">CODE</th>
+                            <th class="p-4">FE_No</th>
+                            <th class="p-4">Depot</th>
+                            <th class="p-4">Caption</th>
+                            <th class="p-4">Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-body" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="designer-overlay" class="fixed inset-0 bg-slate-900/90 z-[100] overflow-y-auto p-4 md:p-8">
+        <div class="max-w-full mx-auto">
+            <div class="flex flex-wrap justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-lg gap-4">
+                <div><h2 class="text-2xl font-bold text-slate-800">Label Designer</h2><p class="text-slate-500">Border, QR Size & Font Customization</p></div>
+                <div class="flex flex-wrap gap-4 items-center">
+                    <select id="bulk-format" class="border rounded-lg px-4 py-2 bg-slate-50 font-medium"><option value="png">ZIP (PNG)</option><option value="jpg">ZIP (JPG)</option><option value="svg">ZIP (SVG)</option></select>
+                    <button onclick="downloadAllZip()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg">Download All Zip</button>
+                    <button onclick="closeDesigner()" class="bg-red-50 text-red-600 px-6 py-2 rounded-lg font-bold">Close</button>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <div class="w-full lg:w-80 space-y-5 bg-white p-6 rounded-2xl shadow-lg h-fit sticky top-4">
+                    <h3 class="font-bold border-b pb-2">Settings</h3>
+                    <div><label class="block text-xs font-bold mb-1 text-slate-500 uppercase">Resolution (DPI)</label>
+                        <select id="export-scale" class="w-full border rounded p-2 text-sm"><option value="4">300 DPI</option><option value="8">600 DPI</option><option value="20" selected>1500 DPI</option></select>
+                    </div>
+                    <div><label class="block text-xs font-bold mb-1 text-slate-500 uppercase">QR Code Size</label><input type="range" id="qr-size-slider" min="50" max="250" value="140" class="w-full"></div>
+                    <div><label class="block text-xs font-bold mb-1 text-slate-500 uppercase">Border Style</label>
+                        <div class="text-[10px] text-slate-400 mb-1">Thickness & Radius</div>
+                        <input type="range" id="border-width" min="0" max="20" value="2" class="w-full mb-2">
+                        <input type="range" id="border-radius" min="0" max="100" value="15" class="w-full">
+                    </div>
+                    <hr>
+                    <div><label class="block text-xs font-bold mb-1 text-slate-500 uppercase">CODE (Size & Gap)</label>
+                        <input type="range" id="code-size" min="10" max="100" value="32" class="w-full mb-2">
+                        <input type="range" id="gap-qr-code" min="0" max="100" value="20" class="w-full">
+                    </div>
+                    <hr>
+                    <div><label class="block text-xs font-bold mb-1 text-slate-500 uppercase">Caption (Size & Gap)</label>
+                        <input type="range" id="caption-size" min="10" max="80" value="22" class="w-full mb-2">
+                        <input type="range" id="gap-code-caption" min="0" max="100" value="15" class="w-full">
+                    </div>
+                </div>
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="designer-preview-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input'), dropZone = document.getElementById('drop-zone'), dataBody = document.getElementById('data-body'), actionButtons = document.getElementById('actions');
+        let tableData = [];
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); processFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+
+        async function processFiles(files) {
+            for (let file of files) {
+                if (!file.type.startsWith('image/')) continue;
+                const qrData = await readQRCode(file);
+                if (qrData) {
+                    const row = parseData(qrData, file.name, tableData.length + 1);
+                    tableData.push(row); renderRow(row);
+                }
+            }
+            if (tableData.length > 0) actionButtons.classList.remove('hidden');
+        }
+
+        function readQRCode(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0);
+                        try { resolve(jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)?.data || null); } catch { resolve(null); }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function parseData(link, fileName, index) {
+            const code = link.includes('=') ? link.split('=').pop().substring(0, 6) : "N/A", name = fileName.split('.')[0], match = name.match(/(\d{3})[-](\d{3})$/);
+            const feNo = match ? `${match[1]}/${match[2]}` : (name.includes('_') ? name.split('_').pop().replace('-','/') : "N/A"), depot = "CDO/CNB-";
+            return { srNo: index, code, feNo, depot, caption: depot + feNo, link };
+        }
+
+        function renderRow(row) {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition-colors bg-white";
+            tr.innerHTML = `
+                <td class="p-4 text-slate-600 font-medium">${row.srNo}</td>
+                <td class="p-4 font-mono text-blue-600 font-bold">${row.code}</td>
+                <td class="p-4 text-slate-700">${row.feNo}</td>
+                <td class="p-4 text-slate-700">${row.depot}</td>
+                <td class="p-4 font-bold text-slate-900">${row.caption}</td>
+                <td class="p-4 text-[10px] text-slate-400 truncate max-w-[150px]" title="${row.link}">${row.link}</td>
+            `;
+            dataBody.appendChild(tr);
+        }
+
+        function openDesigner() { if (!tableData.length) return alert("Pehle scan karein!"); document.getElementById('designer-overlay').style.display = 'block'; generateDesignerCards(); }
+        function closeDesigner() { document.getElementById('designer-overlay').style.display = 'none'; }
+
+        function generateDesignerCards() {
+            const grid = document.getElementById('designer-preview-grid'); grid.innerHTML = '';
+            tableData.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-2xl p-4 shadow-md flex flex-col items-center gap-4 border border-slate-100";
+                const labelId = `label-export-${index}`;
+                card.innerHTML = `
+                    <div id="${labelId}" class="label-container">
+                        <div id="qr-target-${index}" class="qr-wrapper" style="width: 140px;"></div>
+                        <div class="dynamic-code font-bold text-slate-800" style="font-size: 32px; margin-top:20px;">${item.code}</div>
+                        <div class="dynamic-caption font-medium text-slate-600" style="font-size: 22px; margin-top:15px;">${item.caption}</div>
+                    </div>
+                    <div class="w-full flex gap-1">
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'png')" class="flex-1 text-[10px] bg-slate-100 p-1.5 rounded font-bold hover:bg-slate-200 transition-colors">PNG</button>
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'jpg')" class="flex-1 text-[10px] bg-slate-100 p-1.5 rounded font-bold hover:bg-slate-200 transition-colors">JPG</button>
+                        <button onclick="downloadSVG('${index}', '${item.caption}')" class="flex-1 text-[10px] bg-slate-100 p-1.5 rounded font-bold hover:bg-slate-200 transition-colors">SVG</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+                new QRCode(document.getElementById(`qr-target-${index}`), { text: item.link, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
+            });
+            updateDynamicStyles();
+        }
+
+        const controls = ['code-size', 'gap-qr-code', 'caption-size', 'gap-code-caption', 'border-width', 'border-radius', 'qr-size-slider'];
+        controls.forEach(id => document.getElementById(id).addEventListener('input', updateDynamicStyles));
+
+        function updateDynamicStyles() {
+            const cSize = document.getElementById('code-size').value, qGap = document.getElementById('gap-qr-code').value, capSize = document.getElementById('caption-size').value, capGap = document.getElementById('gap-code-caption').value, bWidth = document.getElementById('border-width').value, bRadius = document.getElementById('border-radius').value, qrS = document.getElementById('qr-size-slider').value;
+
+            document.querySelectorAll('.label-container').forEach(el => { el.style.borderWidth = bWidth + 'px'; el.style.borderRadius = bRadius + 'px'; });
+            document.querySelectorAll('.qr-wrapper').forEach(el => { el.style.width = qrS + 'px'; });
+            document.querySelectorAll('.dynamic-code').forEach(el => { el.style.fontSize = cSize + 'px'; el.style.marginTop = qGap + 'px'; });
+            document.querySelectorAll('.dynamic-caption').forEach(el => { el.style.fontSize = capSize + 'px'; el.style.marginTop = capGap + 'px'; });
+        }
+
+        async function downloadSingle(divId, fileName, format) {
+            const scale = document.getElementById('export-scale').value, canvas = await html2canvas(document.getElementById(divId), { scale: scale, useCORS: true });
+            const link = document.createElement('a'); link.download = `${fileName}.${format}`; link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0); link.click();
+        }
+
+        function downloadSVG(index, fileName) {
+            const qrCanvas = document.querySelector(`#qr-target-${index} canvas`), qrS = document.getElementById('qr-size-slider').value, bRadius = document.getElementById('border-radius').value, bWidth = document.getElementById('border-width').value;
+            const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" style="background:white"><rect x="5" y="5" width="290" height="390" rx="${bRadius}" ry="${bRadius}" fill="white" stroke="black" stroke-width="${bWidth}"/><image x="${150 - qrS/2}" y="40" width="${qrS}" height="${qrS}" href="${qrCanvas.toDataURL()}"/><text x="150" y="${60 + parseInt(qrS) + parseInt(document.getElementById('gap-qr-code').value)}" font-family="Arial" font-size="${document.getElementById('code-size').value}" font-weight="bold" text-anchor="middle" fill="black">${tableData[index].code}</text><text x="150" y="${90 + parseInt(qrS) + parseInt(document.getElementById('gap-qr-code').value) + parseInt(document.getElementById('gap-code-caption').value)}" font-family="Arial" font-size="${document.getElementById('caption-size').value}" text-anchor="middle" fill="black">${tableData[index].caption}</text></svg>`;
+            const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([svgContent], {type: 'image/svg+xml'})); link.download = `${fileName}.svg`; link.click();
+        }
+
+        async function downloadAllZip() {
+            const zip = new JSZip(), format = document.getElementById('bulk-format').value, scale = document.getElementById('export-scale').value, labels = document.querySelectorAll('.label-container'), btn = event.target; 
+            btn.innerText = "Processing..."; btn.disabled = true;
+            for(let i=0; i < labels.length; i++) {
+                const canvas = await html2canvas(labels[i], { scale: scale });
+                zip.file(`${tableData[i].caption}.${format}`, canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0).split(',')[1], {base64: true});
+            }
+            zip.generateAsync({type:"blob"}).then(c => { const l = document.createElement('a'); l.href = URL.createObjectURL(c); l.download = `Labels_${Date.now()}.zip`; l.click(); btn.innerText = "Download All Zip"; btn.disabled = false; });
+        }
+
+        document.getElementById('export-excel').addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(tableData.map(i => ({ "Sr No": i.srNo, "CODE": i.code, "FE_No": i.feNo, "Depot": i.depot, "Caption": i.caption, "Link": i.link })));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Data");
+            const d = new Date(); const ds = `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
+            XLSX.writeFile(wb, `FE_QR ${ds}.xlsx`);
+        });
+    </script>
+</body>
+</html>
