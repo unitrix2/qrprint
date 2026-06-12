@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FE QR Print Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+
+    <style>
+        /* Base scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        
+        .drag-over { border-color: #3b82f6 !important; transform: scale(1.02); }
+        
+        /* Transition Effects */
+        body, .bg-white, input, select, button, td, th { transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease; }
+        
+        /* Theming Support */
+        body[data-theme="dark"] { background-color: #0f172a; color: #f8fafc; }
+        body[data-theme="dark"] .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #f8fafc; }
+        body[data-theme="dark"] .text-slate-900, body[data-theme="dark"] .text-slate-800, body[data-theme="dark"] .text-slate-700, body[data-theme="dark"] .text-slate-600 { color: #f1f5f9 !important; }
+        body[data-theme="dark"] .bg-slate-50 { background-color: #0f172a !important; }
+        body[data-theme="dark"] th { background-color: #020617; border-bottom: 1px solid #334155; }
+        body[data-theme="dark"] tr:hover > td { background-color: #334155 !important; }
+        
+        body[data-theme="gradient"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; min-height: 100vh; }
+        body[data-theme="gradient"] .bg-white { background: rgba(255, 255, 255, 0.1) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.2) !important; color: white; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); }
+        body[data-theme="gradient"] .text-slate-900, body[data-theme="gradient"] .text-slate-800, body[data-theme="gradient"] .text-slate-700, body[data-theme="gradient"] .text-slate-600 { color: #ffffff !important; }
+        body[data-theme="gradient"] .bg-slate-50 { background-color: transparent !important; color: white; }
+        body[data-theme="gradient"] th { background-color: rgba(0,0,0,0.4); color: white; }
+        body[data-theme="gradient"] tr:hover > td { background-color: rgba(255,255,255,0.2) !important; }
+        body[data-theme="gradient"] .text-blue-600 { color: #a5b4fc !important; }
+        body[data-theme="gradient"] .border-slate-100 { border-color: rgba(255,255,255,0.2) !important; }
+
+        /* Print/Label Container - MUST always remain white for pure export */
+        .label-container {
+            width: 280px;
+            aspect-ratio: 75 / 100;
+            background: white !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            overflow: hidden;
+            border-style: solid;
+            border-color: #000000 !important;
+            color: black !important;
+            transition: all 0.3s ease;
+        }
+        .label-container * { color: black !important; }
+        
+        #designer-overlay { display: none; backdrop-filter: blur(15px); }
+        .qr-wrapper img, .qr-wrapper canvas { width: 100% !important; height: auto !important; }
+
+        th { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700; }
+    </style>
+</head>
+<body data-theme="light" class="bg-slate-50 min-h-screen font-sans text-slate-900">
+
+    <nav class="bg-white shadow-md py-4 px-8 flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 border-b border-slate-100">
+        <div class="flex flex-col items-center md:items-start mb-4 md:mb-0">
+            <h1 class="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">North Central <span class="text-slate-800">Railway</span></h1>
+            <div class="mt-2 inline-flex items-center px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm w-fit transition-transform hover:scale-105">
+                <span class="mr-2 h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
+                Created by: Salman
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-4">
+            <select id="theme-selector" class="bg-slate-100 border border-slate-200 text-sm rounded-lg px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
+                <option value="light">Light Theme</option>
+                <option value="dark">Dark Theme</option>
+                <option value="gradient">Gradient Theme</option>
+            </select>
+            
+            <button onclick="openDesigner()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                Label Designer
+            </button>
+            <button onclick="location.reload()" class="text-slate-500 hover:text-red-500 font-bold transition-colors">Reset</button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-6">
+        <div class="bg-white rounded-3xl shadow-xl p-10 mb-8 border border-slate-100 text-center transition-all duration-300 hover:shadow-2xl">
+            <label for="file-input" id="drop-zone" class="block border-2 border-dashed border-blue-300 rounded-2xl p-12 cursor-pointer hover:border-blue-500 bg-blue-50/50 transition-all duration-300 group">
+                <input type="file" id="file-input" multiple accept="image/*,application/pdf" class="hidden">
+                <div class="flex justify-center mb-4 text-blue-500 group-hover:scale-110 transition-transform duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Browse Photos/PDFs or Drag & Drop</h2>
+                <p class="text-slate-400 mt-2 text-sm">Supports PNG, JPG, JPEG, PDF containing QR Codes</p>
+            </label>
+        </div>
+
+        <div id="actions" class="hidden mb-6 flex justify-end">
+            <button id="export-excel" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-500/20 transition-all duration-300 hover:-translate-y-0.5 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Export Excel
+            </button>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-800 text-white">
+                        <tr>
+                            <th class="p-5 font-bold tracking-wider">Sr No</th>
+                            <th class="p-5 font-bold tracking-wider">CODE</th>
+                            <th class="p-5 font-bold tracking-wider">FE_No</th>
+                            <th class="p-5 font-bold tracking-wider">Depot</th>
+                            <th class="p-5 font-bold tracking-wider">Caption</th>
+                            <th class="p-5 font-bold tracking-wider">Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-body" class="divide-y divide-slate-100/50"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="designer-overlay" class="fixed inset-0 z-[100] overflow-y-auto p-4 md:p-8 bg-slate-900/80">
+        <div class="max-w-full mx-auto">
+            <div class="flex flex-wrap justify-between items-center mb-8 bg-white p-6 rounded-3xl shadow-2xl gap-4">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-slate-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                        Label Designer
+                    </h2>
+                    <p class="text-slate-500 font-medium ml-10">Advanced Customization & Dimensions</p>
+                </div>
+                <div class="flex flex-wrap gap-4 items-center">
+                    <select id="bulk-format" class="border-2 border-slate-200 rounded-xl px-4 py-2 bg-slate-50 font-bold focus:border-indigo-500 focus:outline-none">
+                        <option value="png">ZIP (PNG)</option>
+                        <option value="jpg">ZIP (JPG)</option>
+                        <option value="svg">ZIP (SVG)</option>
+                    </select>
+                    <button onclick="downloadAllZip()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform hover:-translate-y-0.5">Download All Zip</button>
+                    <button onclick="closeDesigner()" class="bg-red-50 text-red-600 hover:bg-red-100 px-8 py-2.5 rounded-xl font-bold transition-colors">Close</button>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- Settings Panel -->
+                <div class="w-full lg:w-96 space-y-6 bg-white p-8 rounded-3xl shadow-2xl h-fit sticky top-4 border border-slate-100">
+                    <h3 class="font-extrabold text-xl border-b border-slate-100 pb-3 flex items-center gap-2 text-slate-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" /></svg>
+                        Settings
+                    </h3>
+                    
+                    <!-- New Dimensions Section -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-extrabold mb-3 text-slate-500 uppercase tracking-widest">Output Dimensions</label>
+                        <div class="flex gap-2 mb-3 items-center">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-400 font-bold">WIDTH</label>
+                                <input type="number" id="dim-width" value="280" class="w-full border-2 border-slate-200 rounded-lg p-2 text-sm font-bold bg-white focus:border-indigo-500 focus:outline-none transition-colors">
+                            </div>
+                            <span class="text-slate-400 font-bold mt-4">x</span>
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-400 font-bold">HEIGHT</label>
+                                <input type="number" id="dim-height" value="373" class="w-full border-2 border-slate-200 rounded-lg p-2 text-sm font-bold bg-white focus:border-indigo-500 focus:outline-none transition-colors">
+                            </div>
+                            <div class="w-20">
+                                <label class="text-[10px] text-slate-400 font-bold">UNIT</label>
+                                <select id="dim-unit" class="w-full border-2 border-slate-200 rounded-lg p-2 text-sm font-bold bg-white focus:border-indigo-500 focus:outline-none cursor-pointer">
+                                    <option value="px">px</option>
+                                    <option value="cm">cm</option>
+                                    <option value="mm">mm</option>
+                                    <option value="in">inch</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200">
+                            <label for="aspect-lock" class="text-sm font-bold text-slate-600 cursor-pointer flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                Lock Aspect Ratio
+                            </label>
+                            <input type="checkbox" id="aspect-lock" checked class="w-4 h-4 accent-indigo-600 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold mb-2 text-slate-500 uppercase tracking-widest flex justify-between">
+                            <span>QR Code Size</span> <span id="qr-size-val" class="text-indigo-600">140px</span>
+                        </label>
+                        <input type="range" id="qr-size-slider" min="50" max="250" value="140" class="w-full accent-indigo-600">
+                    </div>
+                    
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-extrabold mb-3 text-slate-500 uppercase tracking-widest">Border Styling</label>
+                        <div class="mb-3">
+                            <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1"><span>THICKNESS</span> <span id="bw-val">2px</span></div>
+                            <input type="range" id="border-width" min="0" max="20" value="2" class="w-full accent-indigo-600">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1"><span>RADIUS</span> <span id="br-val">15px</span></div>
+                            <input type="range" id="border-radius" min="0" max="100" value="15" class="w-full accent-indigo-600">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-extrabold mb-3 text-slate-500 uppercase tracking-widest">CODE Typography</label>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <div class="text-[10px] font-bold text-slate-400 mb-1">SIZE</div>
+                                <input type="range" id="code-size" min="10" max="100" value="32" class="w-full accent-indigo-600">
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-[10px] font-bold text-slate-400 mb-1">TOP GAP</div>
+                                <input type="range" id="gap-qr-code" min="0" max="100" value="20" class="w-full accent-indigo-600">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-extrabold mb-3 text-slate-500 uppercase tracking-widest">Caption Typography</label>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <div class="text-[10px] font-bold text-slate-400 mb-1">SIZE</div>
+                                <input type="range" id="caption-size" min="10" max="80" value="22" class="w-full accent-indigo-600">
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-[10px] font-bold text-slate-400 mb-1">TOP GAP</div>
+                                <input type="range" id="gap-code-caption" min="0" max="100" value="15" class="w-full accent-indigo-600">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Previews -->
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 content-start" id="designer-preview-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const fileInput = document.getElementById('file-input'), dropZone = document.getElementById('drop-zone'), dataBody = document.getElementById('data-body'), actionButtons = document.getElementById('actions');
+        let tableData = [];
+
+        // Theme Setup
+        document.getElementById('theme-selector').addEventListener('change', (e) => {
+            document.body.setAttribute('data-theme', e.target.value);
+        });
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); processFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+
+        async function processFiles(files) {
+            for (let file of files) {
+                let qrData = null;
+                if (file.type.startsWith('image/')) {
+                    qrData = await readQRCode(file);
+                } else if (file.type === 'application/pdf') {
+                    qrData = await readPDFQRCode(file);
+                } else continue;
+
+                if (qrData) {
+                    const row = parseData(qrData, file.name, tableData.length + 1);
+                    tableData.push(row); renderRow(row);
+                }
+            }
+            if (tableData.length > 0) actionButtons.classList.remove('hidden');
+        }
+
+        // Image QR
+        function readQRCode(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0);
+                        try { resolve(jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)?.data || null); } catch { resolve(null); }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // PDF QR
+        function readPDFQRCode(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    try {
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const viewport = page.getViewport({ scale: 2.0 }); 
+                            const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                            canvas.height = viewport.height; canvas.width = viewport.width;
+                            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+                            if (code && code.data) return resolve(code.data);
+                        }
+                        resolve(null);
+                    } catch { resolve(null); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parseData(link, fileName, index) {
+            const code = link.includes('=') ? link.split('=').pop().substring(0, 6) : "N/A", name = fileName.split('.')[0], match = name.match(/(\d{3})[-](\d{3})$/);
+            const feNo = match ? `${match[1]}/${match[2]}` : (name.includes('_') ? name.split('_').pop().replace('-','/') : "N/A"), depot = "CDO/CNB-";
+            return { srNo: index, code, feNo, depot, caption: depot + feNo, link };
+        }
+
+        function renderRow(row) {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/80 transition-colors bg-white group";
+            tr.innerHTML = `
+                <td class="p-5 text-slate-600 font-bold border-b border-slate-100/50">${row.srNo}</td>
+                <td class="p-5 font-mono text-blue-600 font-extrabold border-b border-slate-100/50">${row.code}</td>
+                <td class="p-5 text-slate-700 font-medium border-b border-slate-100/50">${row.feNo}</td>
+                <td class="p-5 text-slate-700 font-medium border-b border-slate-100/50">${row.depot}</td>
+                <td class="p-5 font-extrabold text-slate-900 border-b border-slate-100/50">${row.caption}</td>
+                <td class="p-5 text-[11px] text-slate-400 font-medium truncate max-w-[150px] border-b border-slate-100/50" title="${row.link}">${row.link}</td>
+            `;
+            dataBody.appendChild(tr);
+        }
+
+        function openDesigner() { if (!tableData.length) return alert("Pehle file scan karein!"); document.getElementById('designer-overlay').style.display = 'block'; generateDesignerCards(); }
+        function closeDesigner() { document.getElementById('designer-overlay').style.display = 'none'; }
+
+        function generateDesignerCards() {
+            const grid = document.getElementById('designer-preview-grid'); grid.innerHTML = '';
+            tableData.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-3xl p-5 shadow-xl flex flex-col items-center gap-5 border border-slate-100 transition-transform hover:-translate-y-1 hover:shadow-2xl";
+                const labelId = `label-export-${index}`;
+                card.innerHTML = `
+                    <div id="${labelId}" class="label-container rounded-xl">
+                        <div id="qr-target-${index}" class="qr-wrapper" style="width: 140px;"></div>
+                        <div class="dynamic-code font-extrabold text-black tracking-tight" style="font-size: 32px; margin-top:20px;">${item.code}</div>
+                        <div class="dynamic-caption font-bold text-black tracking-wide" style="font-size: 22px; margin-top:15px;">${item.caption}</div>
+                    </div>
+                    <div class="w-full flex gap-2 mt-2">
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'png')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">PNG</button>
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'jpg')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">JPG</button>
+                        <button onclick="downloadSVG('${index}', '${item.caption}')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">SVG</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+                new QRCode(document.getElementById(`qr-target-${index}`), { text: item.link, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
+            });
+            updateDynamicStyles();
+        }
+
+        // Dimensions Logic
+        const dimWidth = document.getElementById('dim-width'), dimHeight = document.getElementById('dim-height'), dimUnit = document.getElementById('dim-unit'), aspectLock = document.getElementById('aspect-lock');
+        let currentRatio = parseFloat(dimWidth.value) / parseFloat(dimHeight.value);
+
+        dimWidth.addEventListener('input', () => {
+            if(aspectLock.checked && dimWidth.value) dimHeight.value = (parseFloat(dimWidth.value) / currentRatio).toFixed(1);
+            updateAspectRatioUI();
+        });
+        dimHeight.addEventListener('input', () => {
+            if(aspectLock.checked && dimHeight.value) dimWidth.value = (parseFloat(dimHeight.value) * currentRatio).toFixed(1);
+            updateAspectRatioUI();
+        });
+        aspectLock.addEventListener('change', () => { if(aspectLock.checked) currentRatio = parseFloat(dimWidth.value) / parseFloat(dimHeight.value); });
+        
+        function updateAspectRatioUI() {
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373;
+            document.querySelectorAll('.label-container').forEach(el => { el.style.aspectRatio = `${w} / ${h}`; });
+        }
+
+        function getExportScaleFactor() {
+            let w = parseFloat(dimWidth.value) || 280, unit = dimUnit.value, pxWidth = w;
+            if(unit === 'cm') pxWidth = w * 37.7952755906;
+            if(unit === 'mm') pxWidth = w * 3.7795275591;
+            if(unit === 'in') pxWidth = w * 96;
+            return pxWidth / 280; // 280 is the base CSS width of .label-container
+        }
+
+        // Live Styling
+        const controls = ['code-size', 'gap-qr-code', 'caption-size', 'gap-code-caption', 'border-width', 'border-radius', 'qr-size-slider'];
+        controls.forEach(id => document.getElementById(id).addEventListener('input', updateDynamicStyles));
+
+        function updateDynamicStyles() {
+            const cSize = document.getElementById('code-size').value, qGap = document.getElementById('gap-qr-code').value, capSize = document.getElementById('caption-size').value, capGap = document.getElementById('gap-code-caption').value, bWidth = document.getElementById('border-width').value, bRadius = document.getElementById('border-radius').value, qrS = document.getElementById('qr-size-slider').value;
+
+            document.getElementById('bw-val').innerText = bWidth + 'px';
+            document.getElementById('br-val').innerText = bRadius + 'px';
+            document.getElementById('qr-size-val').innerText = qrS + 'px';
+
+            document.querySelectorAll('.label-container').forEach(el => { el.style.borderWidth = bWidth + 'px'; el.style.borderRadius = bRadius + 'px'; });
+            document.querySelectorAll('.qr-wrapper').forEach(el => { el.style.width = qrS + 'px'; });
+            document.querySelectorAll('.dynamic-code').forEach(el => { el.style.fontSize = cSize + 'px'; el.style.marginTop = qGap + 'px'; });
+            document.querySelectorAll('.dynamic-caption').forEach(el => { el.style.fontSize = capSize + 'px'; el.style.marginTop = capGap + 'px'; });
+        }
+
+        // Downloads
+        async function downloadSingle(divId, fileName, format) {
+            const scale = getExportScaleFactor();
+            const canvas = await html2canvas(document.getElementById(divId), { scale: scale, useCORS: true, backgroundColor: "#ffffff" });
+            const link = document.createElement('a'); link.download = `${fileName}.${format}`; link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0); link.click();
+        }
+
+        function downloadSVG(index, fileName) {
+            const qrCanvas = document.querySelector(`#qr-target-${index} canvas`), qrS = document.getElementById('qr-size-slider').value, bRadius = document.getElementById('border-radius').value, bWidth = document.getElementById('border-width').value;
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373, unit = dimUnit.value;
+            // Internal coordinate system stays 280 x BaseHeight, SVG outer scales to chosen dimensions
+            let internalHeight = 280 / (w/h); 
+            
+            const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}${unit}" height="${h}${unit}" viewBox="0 0 280 ${internalHeight}" style="background:white"><rect x="${bWidth/2}" y="${bWidth/2}" width="${280-bWidth}" height="${internalHeight-bWidth}" rx="${bRadius}" ry="${bRadius}" fill="white" stroke="black" stroke-width="${bWidth}"/><image x="${140 - qrS/2}" y="${internalHeight * 0.1}" width="${qrS}" height="${qrS}" href="${qrCanvas.toDataURL()}"/><text x="140" y="${(internalHeight * 0.1) + parseInt(qrS) + parseInt(document.getElementById('gap-qr-code').value)}" font-family="Arial, sans-serif" font-size="${document.getElementById('code-size').value}" font-weight="bold" text-anchor="middle" fill="black">${tableData[index].code}</text><text x="140" y="${(internalHeight * 0.1) + parseInt(qrS) + parseInt(document.getElementById('gap-qr-code').value) + parseInt(document.getElementById('gap-code-caption').value)}" font-family="Arial, sans-serif" font-size="${document.getElementById('caption-size').value}" font-weight="bold" text-anchor="middle" fill="black">${tableData[index].caption}</text></svg>`;
+            const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([svgContent], {type: 'image/svg+xml'})); link.download = `${fileName}.svg`; link.click();
+        }
+
+        async function downloadAllZip() {
+            const zip = new JSZip(), format = document.getElementById('bulk-format').value, scale = getExportScaleFactor(), labels = document.querySelectorAll('.label-container'), btn = event.target; 
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...`; 
+            btn.disabled = true;
+            for(let i=0; i < labels.length; i++) {
+                const canvas = await html2canvas(labels[i], { scale: scale, backgroundColor: "#ffffff" });
+                zip.file(`${tableData[i].caption}.${format}`, canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0).split(',')[1], {base64: true});
+            }
+            zip.generateAsync({type:"blob"}).then(c => { const l = document.createElement('a'); l.href = URL.createObjectURL(c); l.download = `Labels_Export_${Date.now()}.zip`; l.click(); btn.innerText = "Download All Zip"; btn.disabled = false; });
+        }
+
+        document.getElementById('export-excel').addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(tableData.map(i => ({ "Sr No": i.srNo, "CODE": i.code, "FE_No": i.feNo, "Depot": i.depot, "Caption": i.caption, "Link": i.link })));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Data");
+            const d = new Date(), ds = `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
+            XLSX.writeFile(wb, `FE_QR_Report_${ds}.xlsx`);
+        });
+    </script>
+</body>
+</html>
