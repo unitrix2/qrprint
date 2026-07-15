@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FE QR Print Pro</title>
+    <script src="vendor/tailwind.min.js"></script>
+    <script src="vendor/jsQR.min.js"></script>
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script src="vendor/qrcode.min.js"></script>
+    <script src="vendor/jszip.min.js"></script>
+    <script src="vendor/html2canvas.min.js"></script>
+    <script src="vendor/jspdf.umd.min.js"></script>
+    <script src="vendor/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        // Premium theme switch — drives the (hidden) native #theme-selector so all
+        // existing theme logic keeps working untouched.
+        function setTheme(v) {
+            const s = document.getElementById('theme-selector');
+            if (!s) return;
+            s.value = v;
+            s.dispatchEvent(new Event('change'));
+            document.querySelectorAll('.theme-switch button').forEach(b => b.classList.toggle('active', b.dataset.t === v));
+            try { localStorage.setItem('fe-theme', v); } catch (e) {}
+        }
+        window.addEventListener('DOMContentLoaded', () => {
+            let saved = 'light';
+            try { saved = localStorage.getItem('fe-theme') || 'light'; } catch (e) {}
+            setTheme(saved);
+        });
+    </script>
+
+    <style>
+        /* ============================================================
+           DESIGN TOKENS — refined premium multi-color system
+           ============================================================ */
+        /* ---- GLASS (default): frosted premium, vibrant indigo→violet→fuchsia ---- */
+        :root, body[data-theme="light"] {
+            --bg-1:#e9edff; --bg-2:#f3eefe; --bg-3:#fdeef8;
+            --surface:rgba(255,255,255,.72);
+            --surface-2:rgba(255,255,255,.55);
+            --surface-3:rgba(255,255,255,.85);
+            --border:rgba(148,163,184,.28);
+            --border-strong:rgba(139,92,246,.5);
+            --text:#181f3a; --muted:#5b6689; --heading:#141a35;
+            --a1:#6366f1; --a2:#8b5cf6; --a3:#e0509e;
+            --a1-soft:rgba(99,102,241,.12); --a2-soft:rgba(139,92,246,.14);
+            --blob1:#c7d2fe; --blob2:#f5d0fe; --blob3:#a5f3fc;
+            --shadow:0 22px 50px -22px rgba(99,70,229,.42);
+            --ring:0 0 0 1px rgba(255,255,255,.6) inset;
+            --track:rgba(148,163,184,.32);
+            --glass-blur:20px; --glass-sat:170%;
+            --designer-bg:linear-gradient(135deg,#e9edff,#f3eefe 50%,#fdeef8);
+        }
+        /* ---- CYBER: dark, high-contrast cyan + violet neon ---- */
+        body[data-theme="dark"] {
+            --bg-1:#060913; --bg-2:#080d1f; --bg-3:#0a0712;
+            --surface:rgba(18,26,48,.66);
+            --surface-2:rgba(24,34,60,.6);
+            --surface-3:rgba(30,42,74,.8);
+            --border:rgba(56,189,248,.2);
+            --border-strong:rgba(56,189,248,.65);
+            --text:#dbeafe; --muted:#8aa0c6; --heading:#f0f9ff;
+            --a1:#22d3ee; --a2:#818cf8; --a3:#e879f9;
+            --a1-soft:rgba(34,211,238,.14); --a2-soft:rgba(129,140,248,.18);
+            --blob1:#0e7490; --blob2:#4338ca; --blob3:#a21caf;
+            --shadow:0 24px 55px -20px rgba(0,0,0,.85);
+            --ring:0 0 0 1px rgba(56,189,248,.14) inset;
+            --track:rgba(56,189,248,.22);
+            --glass-blur:16px; --glass-sat:150%;
+            --designer-bg:linear-gradient(135deg,#060913,#080d1f 50%,#0a0712);
+        }
+        /* ---- MINIMAL: clean, spacious, muted slate + single indigo accent ---- */
+        body[data-theme="gradient"] {
+            --bg-1:#fbfbfd; --bg-2:#f6f7fb; --bg-3:#f2f3f8;
+            --surface:#ffffff;
+            --surface-2:#f7f8fb;
+            --surface-3:#eef1f6;
+            --border:#e6e9f0;
+            --border-strong:#cfd6e4;
+            --text:#1f2430; --muted:#7a8296; --heading:#161a24;
+            --a1:#4f46e5; --a2:#6366f1; --a3:#7c73ff;
+            --a1-soft:rgba(79,70,229,.08); --a2-soft:rgba(99,102,241,.1);
+            --blob1:#e8eaf5; --blob2:#eef0f8; --blob3:#f0eefb;
+            --shadow:0 10px 30px -16px rgba(30,41,59,.22);
+            --ring:none;
+            --track:#e6e9f0;
+            --glass-blur:0px; --glass-sat:100%;
+            --designer-bg:linear-gradient(135deg,#fbfbfd,#f6f7fb 50%,#f2f3f8);
+        }
+        /* ---- APPLE: authentic apple.com — off-white, SF type, system blue, hairlines,
+           soft shadows, no gradients/glow. Built from real Apple tokens. ---- */
+        body[data-theme="apple"] {
+            --bg-1:#fbfbfd; --bg-2:#fbfbfd; --bg-3:#f5f5f7;
+            --surface:#ffffff;
+            --surface-2:#f5f5f7;
+            --surface-3:#f5f5f7;
+            --border:#d2d2d7;
+            --border-strong:#0071e3;
+            --text:#1d1d1f; --muted:#6e6e73; --heading:#1d1d1f;
+            --a1:#0071e3; --a2:#0071e3; --a3:#0077ed;
+            --a1-soft:rgba(0,113,227,.08); --a2-soft:rgba(0,113,227,.1);
+            --blob1:#e8f0fe; --blob2:#f5f5f7; --blob3:#eef4ff;
+            --shadow:0 4px 16px rgba(0,0,0,.08);
+            --ring:none;
+            --track:rgba(120,120,128,.20);
+            --glass-blur:0px; --glass-sat:100%;
+            --designer-bg:#fbfbfd;
+            --apple-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif;
+        }
+
+        /* ============================================================
+           BASE + ANIMATED AURORA BACKGROUND
+           ============================================================ */
+        * { box-sizing:border-box; }
+        html { scroll-behavior:smooth; }
+        body {
+            margin:0;
+            background:linear-gradient(135deg,var(--bg-1),var(--bg-2) 55%,var(--bg-3));
+            color:var(--text);
+            min-height:100vh;
+            position:relative;
+            overflow-x:hidden;
+            transition:background .6s ease,color .5s ease;
+        }
+        body::before, body::after {
+            content:""; position:fixed; z-index:0; border-radius:50%;
+            filter:blur(90px); opacity:.6; pointer-events:none; transition:background .6s ease;
+        }
+        body::before { width:46vw; height:46vw; top:-10vw; left:-8vw;
+            background:radial-gradient(circle at 30% 30%,var(--blob1),transparent 70%);
+            animation:drift1 16s ease-in-out infinite; }
+        body::after { width:42vw; height:42vw; bottom:-12vw; right:-6vw;
+            background:radial-gradient(circle at 60% 40%,var(--blob2),transparent 70%);
+            animation:drift2 20s ease-in-out infinite; }
+        .aurora-3 { position:fixed; z-index:0; border-radius:50%;
+            width:40vw; height:40vw; top:32%; left:42%;
+            background:radial-gradient(circle at 50% 50%,var(--blob3),transparent 70%);
+            filter:blur(100px); opacity:.45; pointer-events:none;
+            animation:drift3 24s ease-in-out infinite; }
+        nav, main { position:relative; z-index:1; }
+
+        /* mouse-reactive particle field (behind content, above aurora) */
+        #particle-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.9; }
+
+        /* ---- animated custom dropdowns ---- */
+        .dd { position:relative; }
+        .dd-btn { display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; width:100%; }
+        .dd-btn .dd-chev { transition:transform .3s cubic-bezier(.2,.8,.2,1); flex:0 0 auto; }
+        .dd.open .dd-btn { border-color:var(--a2); box-shadow:0 0 0 4px color-mix(in srgb,var(--a2) 20%,transparent); }
+        .dd.open .dd-chev { transform:rotate(180deg); }
+        .dd-menu {
+            position:absolute; z-index:200; top:calc(100% + 7px); left:0; min-width:100%;
+            background:var(--surface); border:1px solid var(--border); border-radius:14px;
+            box-shadow:var(--shadow); padding:6px;
+            opacity:0; transform:translateY(-10px) scale(.94); transform-origin:top center;
+            pointer-events:none; transition:opacity .2s ease, transform .3s cubic-bezier(.2,.8,.2,1);
+            backdrop-filter:blur(14px) saturate(160%); -webkit-backdrop-filter:blur(14px) saturate(160%);
+        }
+        .dd.open .dd-menu { opacity:1; transform:none; pointer-events:auto; }
+        .dd-opt {
+            padding:8px 12px; border-radius:9px; font-weight:700; font-size:.75rem; cursor:pointer;
+            color:var(--text); white-space:nowrap; opacity:0; transform:translateX(-8px);
+            transition:background .16s ease, color .16s ease, transform .16s ease;
+        }
+        .dd.open .dd-opt { animation:ddItem .32s cubic-bezier(.2,.8,.2,1) forwards; }
+        .dd-opt:hover { background:var(--a2-soft); color:var(--a2); transform:translateX(3px); }
+        .dd-opt.sel { background:linear-gradient(120deg,var(--a1),var(--a2)); color:#fff; }
+        @keyframes ddItem { to { opacity:1; transform:none; } }
+
+        /* ---- orientation segmented toggle ---- */
+        .orient-switch { display:flex; gap:4px; padding:4px; border-radius:11px; }
+        .orient-btn {
+            flex:1; padding:6px 4px; border-radius:8px; font-size:.68rem; font-weight:800;
+            text-transform:uppercase; letter-spacing:.05em; cursor:pointer; border:none;
+            background:transparent; color:var(--muted);
+            display:flex; align-items:center; justify-content:center; gap:5px;
+            transition:all .28s cubic-bezier(.2,.8,.2,1);
+        }
+        .orient-btn svg { transition:transform .3s ease; }
+        .orient-btn.active-orient {
+            background:linear-gradient(120deg,var(--a1),var(--a2)); color:#fff;
+            box-shadow:0 6px 16px -6px color-mix(in srgb,var(--a2) 70%,transparent);
+            transform:translateY(-1px);
+        }
+
+        /* ---- error-correction segmented toggle (L/M/Q/H) ---- */
+        .ec-switch { display:flex; gap:3px; padding:3px; border-radius:9px; }
+        .ec-btn {
+            flex:1; padding:4px 0; border-radius:6px; font-size:.72rem; font-weight:800;
+            cursor:pointer; border:none; background:transparent; color:var(--muted);
+            transition:all .24s cubic-bezier(.2,.8,.2,1);
+        }
+        .ec-btn:hover { color:var(--text); }
+        .ec-btn.active-ec {
+            background:linear-gradient(120deg,var(--a1),var(--a2)); color:#fff;
+            box-shadow:0 5px 14px -6px color-mix(in srgb,var(--a2) 70%,transparent);
+        }
+
+        /* ---- font picker + B/I/U style toggles (MS-Word-like) ---- */
+        .font-row { display:flex; gap:5px; align-items:stretch; }
+        .font-row .dd { flex:1 1 auto; min-width:0; }
+        .font-row .dd-btn { padding:4px 8px !important; }
+        .font-row .dd-btn .dd-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.72rem; }
+        .fx-group { display:flex; gap:3px; flex:0 0 auto; }
+        .fx-btn {
+            width:22px; display:flex; align-items:center; justify-content:center;
+            border-radius:7px; border:1px solid var(--border); background:var(--surface-2);
+            color:var(--text); font-size:.72rem; cursor:pointer; line-height:1;
+            transition:all .18s ease;
+        }
+        .fx-btn .fx-b { font-weight:900; }
+        .fx-btn .fx-i { font-style:italic; font-weight:800; font-family:Georgia,serif; }
+        .fx-btn .fx-u { text-decoration:underline; font-weight:800; }
+        .fx-btn:hover { border-color:var(--a2); color:var(--a2); }
+        .fx-btn.on {
+            background:linear-gradient(120deg,var(--a1),var(--a2)); color:#fff; border-color:transparent;
+            box-shadow:0 5px 14px -6px color-mix(in srgb,var(--a2) 70%,transparent);
+        }
+        /* font menu is positioned:fixed by JS so it can't be clipped by the tools' overflow
+           and never forces the panel to scroll; each option previews in its own font. */
+        /* font menu is position:fixed, so min-width:100% would resolve to the VIEWPORT
+           width (full-screen band bug). Force a fixed compact width instead. */
+        .dd-menu.font-menu { position:fixed; min-width:0; width:210px; max-height:230px; overflow-y:auto; padding:4px; }
+        .dd-menu.font-menu .dd-opt { font-size:.75rem; padding:5px 10px; border-radius:7px; }
+
+        @keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(9vw,7vh) scale(1.18);} }
+        @keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-8vw,-6vh) scale(1.22);} }
+        @keyframes drift3 { 0%,100%{transform:translate(-50%,-50%) scale(1);} 50%{transform:translate(-38%,-62%) scale(1.28);} }
+
+        ::-webkit-scrollbar { width:10px; height:10px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:linear-gradient(var(--a1),var(--a2)); border-radius:10px; border:2px solid transparent; background-clip:padding-box; }
+        ::-webkit-scrollbar-thumb:hover { background:linear-gradient(var(--a2),var(--a3)); background-clip:padding-box; }
+        ::selection { background:var(--a2); color:#fff; }
+
+        /* ============================================================
+           SURFACES + REUSABLE PREMIUM BITS
+           ============================================================ */
+        .surface {
+            background:var(--surface);
+            border:1px solid var(--border);
+            box-shadow:var(--shadow), var(--ring);
+            backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+            -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+            transition:transform .4s cubic-bezier(.2,.8,.2,1),box-shadow .4s ease,border-color .4s ease,background .5s ease;
+        }
+        /* gradient hairline edge on key panels (glass + cyber only) */
+        .edge-glow { position:relative; }
+        .edge-glow::before {
+            content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+            background:linear-gradient(135deg,color-mix(in srgb,var(--a1) 55%,transparent),transparent 40%,transparent 60%,color-mix(in srgb,var(--a3) 55%,transparent));
+            -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+            -webkit-mask-composite:xor; mask-composite:exclude; opacity:.9;
+        }
+        body[data-theme="gradient"] .edge-glow::before { opacity:.35; }
+        .lift:hover { transform:translateY(-4px); border-color:var(--border-strong); box-shadow:0 26px 55px -22px color-mix(in srgb,var(--a2) 55%,transparent); }
+
+        .grad-text {
+            background:linear-gradient(120deg,var(--a1),var(--a2),var(--a3),var(--a1));
+            background-size:250% auto;
+            -webkit-background-clip:text; background-clip:text;
+            -webkit-text-fill-color:transparent; color:transparent;
+            animation:gradShift 5s linear infinite;
+        }
+        @keyframes gradShift { to { background-position:250% center; } }
+
+        /* entrance */
+        .enter { opacity:0; animation:fadeUp .7s cubic-bezier(.2,.8,.2,1) forwards; }
+        @keyframes fadeUp { from{opacity:0; transform:translateY(26px) scale(.98);} to{opacity:1; transform:none;} }
+        .floaty { animation:floaty 4s ease-in-out infinite; }
+        @keyframes floaty { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-9px);} }
+
+        /* gradient CTA with continuous glow-pulse + shine on hover */
+        .btn-grad {
+            position:relative; overflow:hidden; isolation:isolate;
+            background:linear-gradient(120deg,var(--a1),var(--a2));
+            color:#fff; border:none; cursor:pointer;
+            box-shadow:0 10px 24px -8px color-mix(in srgb,var(--a2) 70%,transparent);
+            animation:glowPulse 3.2s ease-in-out infinite;
+            transition:transform .28s cubic-bezier(.2,.8,.2,1),filter .28s ease;
+        }
+        @keyframes glowPulse {
+            0%,100%{ box-shadow:0 10px 24px -8px color-mix(in srgb,var(--a2) 60%,transparent); }
+            50%{ box-shadow:0 14px 34px -6px color-mix(in srgb,var(--a2) 85%,transparent); }
+        }
+        .btn-grad:hover { transform:translateY(-2px) scale(1.03); filter:brightness(1.08); }
+        .btn-grad:active { transform:translateY(0) scale(.98); }
+        .btn-grad::after {
+            content:""; position:absolute; inset:0; z-index:-1;
+            background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.5) 50%,transparent 80%);
+            transform:translateX(-130%);
+        }
+        .btn-grad:hover::after { animation:shine .85s ease; }
+        @keyframes shine { to { transform:translateX(130%); } }
+
+        .btn-ghost {
+            background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+            cursor:pointer; transition:all .28s ease;
+        }
+        .btn-ghost:hover { border-color:var(--border-strong); transform:translateY(-2px); background:var(--surface-3); }
+
+        .pill { background:var(--surface-2); border:1px solid var(--border); color:var(--muted); }
+        .lbl { color:var(--muted); text-transform:uppercase; letter-spacing:.1em; font-weight:800; font-size:.66rem; }
+
+        /* ---- premium "Created by Salman" signature badge (highlighted on every page) ----
+           Uses a FIXED gold→amber gradient (NOT theme accents) so it always contrasts and
+           pops against the purple/cyan/white themes instead of blending in. */
+        .salman-badge {
+            position:relative; display:inline-flex; align-items:center; gap:6px;
+            padding:4px 13px 4px 9px; border-radius:999px; isolation:isolate;
+            font-size:11px; font-weight:800; letter-spacing:.04em; line-height:1;
+            color:#3a2606; white-space:nowrap; overflow:hidden;
+            background:linear-gradient(120deg,#fde68a 0%,#fbbf24 45%,#f59e0b 75%,#f97316 100%);
+            border:1px solid rgba(255,255,255,.6);
+            box-shadow:0 4px 14px -3px rgba(245,158,11,.75),
+                       0 0 0 3px rgba(251,191,36,.28),
+                       0 0 0 1px rgba(255,255,255,.5) inset;
+            animation:sigGlow 2.6s ease-in-out infinite;
+        }
+        @keyframes sigGlow {
+            0%,100%{ box-shadow:0 4px 14px -3px rgba(245,158,11,.75),0 0 0 3px rgba(251,191,36,.24),0 0 0 1px rgba(255,255,255,.5) inset; }
+            50%{ box-shadow:0 6px 20px -2px rgba(245,158,11,.95),0 0 0 6px rgba(251,191,36,.14),0 0 0 1px rgba(255,255,255,.7) inset; transform:translateY(-1px); }
+        }
+        .salman-badge .sig { font-weight:900; letter-spacing:.02em; color:#241705; }
+        .salman-badge .by { opacity:.9; font-weight:800; text-transform:uppercase; font-size:8px; letter-spacing:.14em; color:#5a3d0a; }
+        .salman-badge .spark {
+            width:13px; height:13px; flex:0 0 auto; color:#7c4a03;
+            filter:drop-shadow(0 0 2px rgba(255,255,255,.9));
+            animation:sigTwinkle 2.2s ease-in-out infinite;
+        }
+        @keyframes sigTwinkle { 0%,100%{ transform:scale(1) rotate(0); opacity:.85; } 50%{ transform:scale(1.25) rotate(18deg); opacity:1; } }
+        /* moving sheen sweep */
+        .salman-badge::after {
+            content:""; position:absolute; inset:0; z-index:-1;
+            background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.7) 50%,transparent 70%);
+            transform:translateX(-130%); animation:sigSheen 3.4s ease-in-out infinite;
+        }
+        @keyframes sigSheen { 0%,55%{ transform:translateX(-130%); } 80%,100%{ transform:translateX(130%); } }
+
+        /* style switcher segmented control */
+        .theme-switch { position:relative; }
+        .theme-switch button { color:var(--muted); position:relative; }
+        .theme-switch button:hover { color:var(--text); transform:translateY(-1px); }
+        .theme-switch button.active {
+            background:linear-gradient(135deg,var(--a1),var(--a2)); color:#fff;
+            box-shadow:0 6px 16px -6px color-mix(in srgb,var(--a2) 75%,transparent);
+        }
+        .theme-switch button svg { transition:transform .3s cubic-bezier(.2,.8,.2,1); }
+        .theme-switch button.active svg { transform:rotate(-8deg) scale(1.1); }
+
+        /* sliders */
+        input[type=range] {
+            -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+            background:var(--track); outline:none; cursor:pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance:none; appearance:none; width:18px; height:18px; border-radius:50%;
+            background:linear-gradient(135deg,var(--a1),var(--a2));
+            border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.35);
+            transition:transform .2s ease,box-shadow .2s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.3); box-shadow:0 0 0 7px color-mix(in srgb,var(--a2) 22%,transparent); }
+        input[type=range]::-moz-range-thumb {
+            width:18px; height:18px; border-radius:50%; border:3px solid #fff;
+            background:linear-gradient(135deg,var(--a1),var(--a2)); box-shadow:0 2px 8px rgba(0,0,0,.35); cursor:pointer;
+        }
+
+        /* fields */
+        .field { background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+            transition:border-color .28s ease,box-shadow .28s ease,background .3s ease; }
+        .field:focus { outline:none; border-color:var(--a2); box-shadow:0 0 0 4px color-mix(in srgb,var(--a2) 20%,transparent); }
+        select.field option { color:#0f172a; }
+
+        .drag-over { border-color:var(--a1) !important; transform:scale(1.02);
+            box-shadow:0 0 0 6px color-mix(in srgb,var(--a1) 18%,transparent) !important; }
+
+        /* animated conic ring around upload icon */
+        .ring-anim { position:relative; }
+        .ring-anim::before {
+            content:""; position:absolute; inset:-5px; border-radius:inherit; z-index:-1;
+            background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1));
+            animation:spin 4s linear infinite; filter:blur(2px); opacity:.9;
+        }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        th { text-transform:uppercase; font-size:.72rem; letter-spacing:.08em; font-weight:800; }
+        /* refined table header — subtle tinted bar with a gradient underline, not a heavy solid block */
+        .table-head { background:var(--surface-3); }
+        .table-head th { color:var(--muted); position:relative; border-bottom:2px solid transparent;
+            background-image:linear-gradient(var(--surface-3),var(--surface-3)),linear-gradient(120deg,var(--a1),var(--a2),var(--a3));
+            background-origin:border-box; background-clip:padding-box,border-box; }
+        #data-body tr { animation:rowIn .5s cubic-bezier(.2,.8,.2,1) both; }
+        @keyframes rowIn { from{opacity:0; transform:translateX(-14px);} to{opacity:1; transform:none;} }
+
+        /* ============================================================
+           LEGACY THEME OVERRIDES for JS-generated markup
+           (table rows use .bg-white + slate text; designer cards too)
+           ============================================================ */
+        body[data-theme="dark"] .bg-white { background-color:var(--surface-2) !important; border-color:var(--border) !important; color:var(--text) !important; }
+        body[data-theme="dark"] .text-slate-900, body[data-theme="dark"] .text-slate-800, body[data-theme="dark"] .text-slate-700, body[data-theme="dark"] .text-slate-600 { color:#dbeafe !important; }
+        body[data-theme="dark"] .text-slate-500, body[data-theme="dark"] .text-slate-400 { color:#8aa0c6 !important; }
+        body[data-theme="dark"] .text-blue-600 { color:#22d3ee !important; }
+        body[data-theme="dark"] .bg-slate-50, body[data-theme="dark"] .bg-slate-100 { background-color:var(--surface-3) !important; color:#dbeafe !important; }
+        body[data-theme="dark"] .border-slate-100, body[data-theme="dark"] .border-slate-200 { border-color:var(--border) !important; }
+        body[data-theme="dark"] tr.bg-white:hover > td { background-color:var(--surface-3) !important; }
+
+        /* Minimal (gradient key) — light & clean; keep slate text, indigo accent */
+        body[data-theme="gradient"] .bg-white { background:var(--surface) !important; border-color:var(--border) !important; }
+        body[data-theme="gradient"] .text-blue-600 { color:var(--a1) !important; }
+        body[data-theme="gradient"] .border-slate-100, body[data-theme="gradient"] .border-slate-200 { border-color:var(--border) !important; }
+        body[data-theme="gradient"] tr.bg-white:hover > td { background-color:var(--surface-2) !important; }
+        /* designer card buttons keep readable */
+        body[data-theme="dark"] .bg-slate-100.text-slate-700 { color:#dbeafe !important; }
+
+        /* ============================================================
+           LABEL CONTAINER — always white for pure export (do NOT theme)
+           ============================================================ */
+        .label-container {
+            width:280px; aspect-ratio:75 / 100;
+            background:white !important; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; padding:20px;
+            box-shadow:0 10px 25px rgba(0,0,0,.15); overflow:hidden;
+            border-style:solid; border-color:#000000 !important; color:black !important;
+            transition:all .3s ease;
+        }
+        .label-container * { color:black !important; }
+        .qr-wrapper img, .qr-wrapper canvas { width:100% !important; height:auto !important; }
+
+        /* ============================================================
+           DESIGNER — SEPARATE FULL-SCREEN "PAGE"
+           header fixed; tools + preview each scroll independently
+           ============================================================ */
+        #designer-overlay { display:none; position:fixed; inset:0; z-index:100; background:var(--designer-bg); }
+        #designer-overlay .d-shell { height:100vh; height:100dvh; display:flex; flex-direction:column; }
+        /* header must sit ABOVE the body so its dropdown menus overlay the cards
+           (otherwise the menu drops behind the preview cards and options can't be clicked) */
+        .d-header { flex:0 0 auto; position:relative; z-index:30; }
+        .d-body { flex:1 1 auto; display:flex; min-height:0; gap:0; position:relative; z-index:10; }
+        .d-tools { flex:0 0 320px; width:320px; overflow-y:auto; min-height:0; padding:12px; }
+        .d-preview { flex:1 1 auto; overflow-y:auto; min-height:0; padding:20px; }
+        .d-card-enter { opacity:0; animation:fadeUp .55s cubic-bezier(.2,.8,.2,1) forwards; }
+
+        /* compact tool block */
+        .tool { background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:8px 11px; }
+        .tool + .tool { margin-top:7px; }
+        .tool-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+        /* small screens: tools become a top strip that itself scrolls; preview below */
+        @media (max-width:900px) {
+            .d-body { flex-direction:column; }
+            .d-tools { flex:0 0 auto; width:100%; max-height:42vh; }
+            .d-preview { flex:1 1 auto; }
+        }
+
+        /* ============================================================
+           APPLE THEME — scratch-built from apple.com / HIG.
+           Only applies under body[data-theme="apple"]; other themes untouched.
+           Core logic/markup unchanged — pure re-skin.
+           ============================================================ */
+        body[data-theme="apple"] {
+            font-family:var(--apple-font);
+            letter-spacing:-.022em;
+            background:#fbfbfd;
+        }
+        /* kill the animated aurora blobs + particles — Apple pages are calm & static */
+        body[data-theme="apple"]::before,
+        body[data-theme="apple"]::after,
+        body[data-theme="apple"] .aurora-3 { display:none !important; }
+        body[data-theme="apple"] #particle-canvas { display:none !important; }
+
+        /* typography: SF everywhere, tight tracking on headings, no gradient text */
+        body[data-theme="apple"] h1,
+        body[data-theme="apple"] h2,
+        body[data-theme="apple"] h3 { letter-spacing:-.015em; font-weight:600; }
+        body[data-theme="apple"] .grad-text {
+            background:none !important; -webkit-text-fill-color:currentColor; color:var(--heading) !important;
+            animation:none !important; font-weight:600; letter-spacing:-.015em;
+        }
+        body[data-theme="apple"] .lbl {
+            text-transform:uppercase; letter-spacing:.06em; font-weight:600;
+            color:var(--muted); font-size:.64rem;
+        }
+
+        /* nav: apple.com frosted material bar, hairline, calm */
+        body[data-theme="apple"] nav.surface {
+            background:rgba(251,251,253,.72) !important;
+            backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+            border:1px solid rgba(0,0,0,.10) !important;
+            box-shadow:none !important;
+            border-radius:18px;
+        }
+
+        /* surfaces: white cards, hairline border, soft low shadow, no glow ring/edge */
+        body[data-theme="apple"] .surface {
+            background:#ffffff; border:1px solid var(--border);
+            box-shadow:0 4px 16px rgba(0,0,0,.06); backdrop-filter:none; -webkit-backdrop-filter:none;
+            border-radius:18px;
+        }
+        body[data-theme="apple"] .edge-glow::before { display:none !important; }
+        body[data-theme="apple"] .lift:hover {
+            transform:translateY(-3px); border-color:var(--border);
+            box-shadow:0 12px 28px rgba(0,0,0,.10);
+        }
+
+        /* primary button: solid system-blue pill, regular weight, subtle press — no glow/shine/float */
+        body[data-theme="apple"] .btn-grad {
+            background:#0071e3 !important; color:#fff; border-radius:980px;
+            box-shadow:none !important; animation:none !important;
+            font-weight:400; letter-spacing:-.022em;
+            transition:background-color .18s var(--ease,ease),transform .12s ease;
+        }
+        body[data-theme="apple"] .btn-grad:hover { background:#0077ed !important; transform:none; filter:none; }
+        body[data-theme="apple"] .btn-grad:active { background:#006edb !important; transform:scale(.98); }
+        body[data-theme="apple"] .btn-grad::after { display:none !important; }
+        body[data-theme="apple"] .btn-grad.floaty,
+        body[data-theme="apple"] .floaty { animation:none !important; }
+        /* ghost/secondary: tonal blue */
+        body[data-theme="apple"] .btn-ghost {
+            background:rgba(0,113,227,.08); border:none; color:#0071e3; border-radius:980px; font-weight:400;
+        }
+        body[data-theme="apple"] .btn-ghost:hover { background:rgba(0,113,227,.15); transform:none; }
+
+        /* "by Salman" — Apple would NOT use a gold sticker. Clean tonal blue capsule. */
+        body[data-theme="apple"] .salman-badge {
+            background:rgba(0,113,227,.1) !important; color:#0071e3 !important;
+            border:none !important; box-shadow:none !important; animation:none !important;
+            font-weight:600; letter-spacing:-.01em; padding:4px 12px 4px 9px;
+        }
+        body[data-theme="apple"] .salman-badge::after { display:none !important; }
+        body[data-theme="apple"] .salman-badge .spark { color:#0071e3; filter:none; animation:none; }
+        body[data-theme="apple"] .salman-badge .by { color:#0071e3; opacity:.7; }
+        body[data-theme="apple"] .salman-badge .sig { color:#0071e3; }
+
+        /* style-switcher active pill: solid blue, no gradient */
+        body[data-theme="apple"] .theme-switch { background:rgba(120,120,128,.12); border:none; }
+        body[data-theme="apple"] .theme-switch button.active {
+            background:#fff; color:#0071e3;
+            box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04);
+        }
+        body[data-theme="apple"] .theme-switch button.active svg { transform:none; }
+
+        /* drop zone: calm hairline, subtle system-gray fill */
+        body[data-theme="apple"] #drop-zone {
+            border:2px dashed var(--border) !important; background:#f5f5f7 !important; border-radius:16px;
+        }
+        body[data-theme="apple"] #drop-zone .ring-anim::before { display:none !important; }
+        body[data-theme="apple"] #drop-zone .btn-grad { border-radius:16px; }
+        body[data-theme="apple"] .drag-over {
+            border-color:#0071e3 !important; transform:none;
+            box-shadow:0 0 0 4px rgba(0,113,227,.15) !important;
+        }
+
+        /* table: horizontal hairlines only, muted header, no colored bar/underline */
+        body[data-theme="apple"] .table-head { background:transparent; }
+        body[data-theme="apple"] .table-head th {
+            background-image:none; border-bottom:1px solid var(--border);
+            color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-weight:600; font-size:.7rem;
+        }
+        body[data-theme="apple"] .text-blue-600 { color:#0071e3 !important; }
+        body[data-theme="apple"] #record-count { background:rgba(0,113,227,.1) !important; color:#0071e3 !important; }
+        body[data-theme="apple"] #data-body tr { animation:none; }
+        body[data-theme="apple"] .table-head span[style*="box-shadow"] { box-shadow:none !important; }
+
+        /* iOS sliders: thin gray track, white circular thumb w/ soft shadow, blue is via thumb only */
+        body[data-theme="apple"] input[type=range] { height:4px; background:rgba(120,120,128,.2); }
+        body[data-theme="apple"] input[type=range]::-webkit-slider-thumb {
+            width:22px; height:22px; background:#fff; border:none;
+            box-shadow:0 3px 8px rgba(0,0,0,.15),0 0 0 .5px rgba(0,0,0,.06);
+        }
+        body[data-theme="apple"] input[type=range]::-webkit-slider-thumb:hover {
+            transform:none; box-shadow:0 4px 12px rgba(0,0,0,.2),0 0 0 .5px rgba(0,0,0,.06);
+        }
+        body[data-theme="apple"] input[type=range]::-moz-range-thumb {
+            width:22px; height:22px; background:#fff; border:none; box-shadow:0 3px 8px rgba(0,0,0,.15);
+        }
+
+        /* segmented controls (orientation / EC): iOS look — white selected pill, no gradient */
+        body[data-theme="apple"] .orient-switch,
+        body[data-theme="apple"] .ec-switch { background:rgba(120,120,128,.12) !important; border:none !important; }
+        body[data-theme="apple"] .orient-btn.active-orient,
+        body[data-theme="apple"] .ec-btn.active-ec {
+            background:#fff !important; color:#1d1d1f !important;
+            box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04) !important;
+            transform:none;
+        }
+        body[data-theme="apple"] .orient-btn, body[data-theme="apple"] .ec-btn { text-transform:none; letter-spacing:-.01em; }
+
+        /* fields, dropdowns, fx buttons: 12px radius, hairline, blue focus ring */
+        body[data-theme="apple"] .field { background:#fff; border:1px solid var(--border); border-radius:12px; }
+        body[data-theme="apple"] .field:focus,
+        body[data-theme="apple"] .dd.open .dd-btn {
+            border-color:#0071e3; box-shadow:0 0 0 4px rgba(0,113,227,.25);
+        }
+        body[data-theme="apple"] .dd-menu { border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.12); background:#fff; backdrop-filter:none; -webkit-backdrop-filter:none; }
+        body[data-theme="apple"] .dd-opt.sel { background:#0071e3; color:#fff; }
+        body[data-theme="apple"] .dd-opt:hover { background:rgba(0,113,227,.08); color:#0071e3; transform:none; }
+        body[data-theme="apple"] .fx-btn.on { background:#0071e3; box-shadow:none; }
+        body[data-theme="apple"] .tool { border-radius:12px; }
+
+        /* checkbox / scrollbar / selection accents */
+        body[data-theme="apple"] input[type=checkbox] { accent-color:#0071e3 !important; }
+        body[data-theme="apple"] ::-webkit-scrollbar-thumb { background:rgba(120,120,128,.4); }
+        body[data-theme="apple"] ::-webkit-scrollbar-thumb:hover { background:rgba(120,120,128,.6); }
+        body[data-theme="apple"] ::selection { background:rgba(0,113,227,.22); color:#1d1d1f; }
+
+        /* designer preview cards: clean white, hairline, soft shadow (labels stay pure B/W) */
+        body[data-theme="apple"] .d-card-enter,
+        body[data-theme="apple"] #designer-preview-grid > div {
+            box-shadow:0 4px 16px rgba(0,0,0,.06) !important;
+        }
+
+        /* ============ PRINT SUPPORT (exact size, no shift) ============ */
+        #print-area { display:none; }
+        @media print {
+            body > *:not(#print-area) { display:none !important; }
+            #print-area { display:block !important; }
+            body { background:#fff !important; margin:0 !important; padding:0 !important; }
+            body::before, body::after, .aurora-3 { display:none !important; }
+            .print-label { page-break-after:always; break-after:page; display:flex; align-items:center; justify-content:center; width:100%; height:100%; box-sizing:border-box; }
+            .print-label:last-child { page-break-after:auto; break-after:auto; }
+            .print-label .label-container { box-shadow:none !important; margin:0 !important; }
+            #print-area.a4-grid { display:flex !important; flex-wrap:wrap; align-content:flex-start; gap:6mm; padding:8mm; }
+            #print-area.a4-grid .print-label { display:inline-flex; width:auto; height:auto; page-break-after:auto; break-after:auto; break-inside:avoid; }
+            .label-container * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        }
+    </style>
+</head>
+<body data-theme="light" class="min-h-screen font-sans">
+    <div class="aurora-3"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- ============================ NAVBAR ============================ -->
+    <nav class="surface py-3 px-5 md:px-7 flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 mx-3 md:mx-6 mt-4 rounded-2xl">
+        <div class="flex items-center gap-3 mb-3 md:mb-0">
+            <div class="h-11 w-11 rounded-2xl btn-grad flex items-center justify-center floaty" style="animation:floaty 4s ease-in-out infinite, glowPulse 3.2s ease-in-out infinite;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm11-2h2v2h-2v-2zm4 0h1v2h-1v-2zm-4 4h2v2h-2v-2zm2 2h3v2h-3v-2zm2-2h1v2h-1v-2z"/></svg>
+            </div>
+            <div class="flex flex-col items-start">
+                <h1 class="text-xl md:text-2xl font-extrabold grad-text leading-tight">FE QR Print Pro</h1>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-[11px] font-bold" style="color:var(--muted)">North Central Railway</span>
+                    <span class="salman-badge">
+                        <svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.3L19 9.2l-4.3 3.1L16 18l-4-3.2L8 18l1.3-5.7L5 9.2l5.1-1.9L12 2z"/></svg>
+                        <span class="by">Created&nbsp;by</span><span class="sig">Salman</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3">
+            <div class="theme-switch flex items-center gap-1 p-1 rounded-xl pill">
+                <button data-t="light" onclick="setTheme('light')" title="Glass — frosted premium" class="h-8 w-8 rounded-lg flex items-center justify-center transition-all">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8l7-4 7 4-7 4-7-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 12l7 4 7-4M5 16l7 4 7-4" opacity=".55"/></svg>
+                </button>
+                <button data-t="dark" onclick="setTheme('dark')" title="Cyber — dark neon" class="h-8 w-8 rounded-lg flex items-center justify-center transition-all">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+                </button>
+                <button data-t="gradient" onclick="setTheme('gradient')" title="Minimal — clean &amp; sleek" class="h-8 w-8 rounded-lg flex items-center justify-center transition-all">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 3a9 9 0 000 18z" fill="currentColor" stroke="none"/></svg>
+                </button>
+                <button data-t="apple" onclick="setTheme('apple')" title="Apple — designed like Apple would" class="h-8 w-8 rounded-lg flex items-center justify-center transition-all">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.54c-.03-2.65 2.17-3.92 2.27-3.98-1.24-1.81-3.16-2.06-3.84-2.09-1.63-.16-3.18.96-4.01.96-.83 0-2.1-.94-3.46-.91-1.78.03-3.42 1.03-4.34 2.62-1.85 3.21-.47 7.95 1.33 10.55.88 1.27 1.93 2.7 3.31 2.65 1.33-.05 1.83-.86 3.44-.86 1.61 0 2.06.86 3.46.83 1.43-.02 2.34-1.3 3.21-2.58 1.01-1.48 1.43-2.91 1.46-2.99-.03-.01-2.8-1.08-2.83-4.27zM14.6 4.84c.73-.89 1.22-2.12 1.09-3.34-1.05.04-2.32.7-3.08 1.58-.68.78-1.27 2.03-1.11 3.23 1.17.09 2.37-.59 3.1-1.47z"/></svg>
+                </button>
+            </div>
+            <select id="theme-selector" class="hidden">
+                <option value="light">Glass</option>
+                <option value="dark">Cyber</option>
+                <option value="gradient">Minimal</option>
+                <option value="apple">Apple</option>
+            </select>
+
+            <button onclick="openDesigner()" class="btn-grad px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                Label Designer
+            </button>
+            <button onclick="location.reload()" class="btn-ghost px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-1.5">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3m2 8a8 8 0 01-14 3"/></svg>
+                Reset
+            </button>
+        </div>
+    </nav>
+
+    <!-- ============================ MAIN (data only) ============================ -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6">
+        <div class="surface lift enter edge-glow rounded-3xl p-4 md:p-5 mb-6 text-center" style="animation-delay:.05s">
+            <label for="file-input" id="drop-zone" class="flex items-center justify-center gap-5 rounded-2xl px-6 py-6 cursor-pointer transition-all duration-300 group relative overflow-hidden" style="border:2px dashed var(--border-strong); background:var(--surface-2);">
+                <input type="file" id="file-input" multiple accept="image/*,application/pdf" class="hidden">
+                <div class="ring-anim h-14 w-14 rounded-2xl btn-grad flex items-center justify-center floaty group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                </div>
+                <div class="text-left">
+                    <h2 class="text-base md:text-lg font-extrabold leading-tight" style="color:var(--heading)">Drag &amp; Drop your QR files here</h2>
+                    <p class="mt-0.5 text-xs font-medium" style="color:var(--muted)">or <span class="grad-text font-bold">browse</span> — PNG, JPG, JPEG &amp; PDF</p>
+                </div>
+            </label>
+        </div>
+
+        <div id="actions" class="hidden mb-5 flex justify-end">
+            <button id="export-excel" class="btn-grad px-6 py-3 rounded-xl font-bold flex items-center gap-2 text-sm" style="--a1:#10b981; --a2:#059669;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Export Excel
+            </button>
+        </div>
+
+        <div class="surface lift enter edge-glow rounded-3xl overflow-hidden" style="animation-delay:.12s">
+            <div class="px-6 py-4 flex items-center gap-2 border-b" style="border-color:var(--border)">
+                <span class="h-2.5 w-2.5 rounded-full" style="background:var(--a1); box-shadow:0 0 10px var(--a1)"></span>
+                <span class="h-2.5 w-2.5 rounded-full" style="background:var(--a2); box-shadow:0 0 10px var(--a2)"></span>
+                <span class="h-2.5 w-2.5 rounded-full" style="background:var(--a3); box-shadow:0 0 10px var(--a3)"></span>
+                <h3 class="ml-2 font-extrabold text-sm" style="color:var(--heading)">Scanned Records</h3>
+                <span id="record-count" class="ml-auto text-[11px] font-bold px-2.5 py-1 rounded-full" style="background:var(--a1-soft); color:var(--a1)"></span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="table-head">
+                            <th class="p-4 md:p-5 tracking-wider">Sr No</th>
+                            <th class="p-4 md:p-5 tracking-wider">CODE</th>
+                            <th class="p-4 md:p-5 tracking-wider">FE_No</th>
+                            <th class="p-4 md:p-5 tracking-wider">Depot</th>
+                            <th class="p-4 md:p-5 tracking-wider">Caption</th>
+                            <th class="p-4 md:p-5 tracking-wider">Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-body" class="divide-y" style="border-color:var(--border)"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- ============================ DESIGNER (separate full-screen page) ============================ -->
+    <div id="designer-overlay">
+        <div class="d-shell">
+            <!-- fixed header -->
+            <div class="d-header surface flex flex-wrap justify-between items-center gap-3 px-5 md:px-7 py-3.5" style="border-radius:0; border-left:0; border-right:0; border-top:0;">
+                <div class="flex items-center gap-3">
+                    <div class="h-11 w-11 rounded-2xl btn-grad flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg md:text-xl font-extrabold grad-text leading-tight">Label Designer</h2>
+                        <p class="text-[11px] font-medium flex items-center gap-2" style="color:var(--muted)">
+                            <span>Live preview · exact-size export &amp; print</span>
+                            <span class="salman-badge">
+                                <svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.3L19 9.2l-4.3 3.1L16 18l-4-3.2L8 18l1.3-5.7L5 9.2l5.1-1.9L12 2z"/></svg>
+                                <span class="by">Created&nbsp;by</span><span class="sig">Salman</span>
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <div class="dd" data-dd="bulk-format" style="min-width:132px">
+                        <div class="dd-btn field rounded-xl px-3 py-2 font-bold text-xs">
+                            <span class="dd-label">ZIP (PNG)</span>
+                            <svg class="dd-chev h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                        <div class="dd-menu">
+                            <div class="dd-opt sel" data-val="png">ZIP (PNG)</div>
+                            <div class="dd-opt" data-val="jpg">ZIP (JPG)</div>
+                            <div class="dd-opt" data-val="svg">ZIP (SVG)</div>
+                            <div class="dd-opt" data-val="pdf-single">PDF (1 label / page)</div>
+                            <div class="dd-opt" data-val="pdf-a4">PDF (A4 grid sheet)</div>
+                        </div>
+                        <select id="bulk-format" class="hidden">
+                            <option value="png">ZIP (PNG)</option>
+                            <option value="jpg">ZIP (JPG)</option>
+                            <option value="svg">ZIP (SVG)</option>
+                            <option value="pdf-single">PDF (1 label / page)</option>
+                            <option value="pdf-a4">PDF (A4 grid sheet)</option>
+                        </select>
+                    </div>
+                    <button onclick="downloadAllZip()" class="btn-grad px-5 py-2.5 rounded-xl font-bold text-xs">Export All</button>
+                    <div class="dd" data-dd="print-mode" style="min-width:118px">
+                        <div class="dd-btn field rounded-xl px-3 py-2 font-bold text-xs">
+                            <span class="dd-label">Print: 1/page</span>
+                            <svg class="dd-chev h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                        <div class="dd-menu">
+                            <div class="dd-opt sel" data-val="single">Print: 1/page</div>
+                            <div class="dd-opt" data-val="a4">Print: A4 grid</div>
+                        </div>
+                        <select id="print-mode" class="hidden">
+                            <option value="single">Print: 1/page</option>
+                            <option value="a4">Print: A4 grid</option>
+                        </select>
+                    </div>
+                    <button onclick="printLabels(document.getElementById('print-mode').value)" class="btn-grad px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5" style="--a1:#475569; --a2:#0f172a;">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>Print
+                    </button>
+                    <button onclick="closeDesigner()" class="btn-ghost px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 text-red-500 hover:text-red-600">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- body: tools (left, own scroll) + preview (right, own scroll) -->
+            <div class="d-body">
+                <aside class="d-tools">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" style="color:var(--a2)" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" /></svg>
+                        <span class="lbl" style="font-size:.72rem">Settings</span>
+                    </div>
+
+                    <!-- Dimensions -->
+                    <div class="tool">
+                        <label class="block lbl mb-1.5">Output Dimensions</label>
+                        <div class="flex gap-2 mb-2 items-end">
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold" style="color:var(--muted)">WIDTH</label>
+                                <input type="number" id="dim-width" value="75" class="field w-full rounded-lg p-1.5 text-sm font-bold">
+                            </div>
+                            <span class="font-bold pb-2" style="color:var(--muted)">×</span>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold" style="color:var(--muted)">HEIGHT</label>
+                                <input type="number" id="dim-height" value="100" class="field w-full rounded-lg p-1.5 text-sm font-bold">
+                            </div>
+                            <div class="w-16">
+                                <label class="text-[9px] font-bold" style="color:var(--muted)">UNIT</label>
+                                <div class="dd" data-dd="dim-unit">
+                                    <div class="dd-btn field rounded-lg px-2 py-1.5 text-sm font-bold">
+                                        <span class="dd-label">mm</span>
+                                        <svg class="dd-chev h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 9l6 6 6-6"/></svg>
+                                    </div>
+                                    <div class="dd-menu">
+                                        <div class="dd-opt" data-val="px">px</div>
+                                        <div class="dd-opt" data-val="cm">cm</div>
+                                        <div class="dd-opt sel" data-val="mm">mm</div>
+                                        <div class="dd-opt" data-val="in">in</div>
+                                    </div>
+                                    <select id="dim-unit" class="hidden">
+                                        <option value="px">px</option>
+                                        <option value="cm">cm</option>
+                                        <option value="mm" selected>mm</option>
+                                        <option value="in">in</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- orientation toggle -->
+                        <div class="orient-switch mb-1.5" style="background:var(--surface-3); border:1px solid var(--border)">
+                            <button type="button" id="orient-portrait" class="orient-btn active-orient" onclick="setOrientation('portrait')">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="2"/></svg>
+                                Vertical
+                            </button>
+                            <button type="button" id="orient-landscape" class="orient-btn" onclick="setOrientation('landscape')">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/></svg>
+                                Horizontal
+                            </button>
+                        </div>
+                        <label for="aspect-lock" class="flex items-center justify-between rounded-lg px-2.5 py-1.5 cursor-pointer" style="background:var(--surface-3); border:1px solid var(--border)">
+                            <span class="text-xs font-bold flex items-center gap-1.5" style="color:var(--text)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" style="color:var(--a2)" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                Lock Aspect Ratio
+                            </span>
+                            <input type="checkbox" id="aspect-lock" checked class="w-4 h-4 cursor-pointer" style="accent-color:var(--a2)">
+                        </label>
+                    </div>
+
+                    <!-- QR size + Vertical position -->
+                    <div class="tool tool-grid">
+                        <div>
+                            <div class="flex justify-between mb-1.5"><span class="lbl">QR Size</span><span id="qr-size-val" class="grad-text font-extrabold text-xs">140px</span></div>
+                            <input type="range" id="qr-size-slider" min="50" max="250" value="140">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1.5"><span class="lbl">Vert. Pos</span><span id="vpos-val" class="grad-text font-extrabold text-xs">0px</span></div>
+                            <input type="range" id="vpos-slider" min="-120" max="120" value="0">
+                        </div>
+                        <div class="col-span-2">
+                            <div class="flex justify-between items-center mb-1"><span class="lbl">QR Error Correction</span><span id="ec-val" class="font-bold text-[10px]" style="color:var(--muted)">H · ~30% recovery</span></div>
+                            <div class="ec-switch" style="background:var(--surface-3); border:1px solid var(--border)">
+                                <button type="button" class="ec-btn" data-ec="L" onclick="setErrorCorrection('L')" title="Low — ~7% damage recovery">L</button>
+                                <button type="button" class="ec-btn" data-ec="M" onclick="setErrorCorrection('M')" title="Medium — ~15% damage recovery">M</button>
+                                <button type="button" class="ec-btn" data-ec="Q" onclick="setErrorCorrection('Q')" title="Quartile — ~25% damage recovery">Q</button>
+                                <button type="button" class="ec-btn active-ec" data-ec="H" onclick="setErrorCorrection('H')" title="High — ~30% damage recovery">H</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Border -->
+                    <div class="tool tool-grid">
+                        <div>
+                            <div class="flex justify-between mb-1.5"><span class="lbl">Border W</span><span id="bw-val" class="font-bold text-xs" style="color:var(--muted)">2px</span></div>
+                            <input type="range" id="border-width" min="0" max="20" value="2">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1.5"><span class="lbl">Radius</span><span id="br-val" class="font-bold text-xs" style="color:var(--muted)">15px</span></div>
+                            <input type="range" id="border-radius" min="0" max="100" value="15">
+                        </div>
+                    </div>
+
+                    <!-- CODE typography -->
+                    <div class="tool">
+                        <div class="tool-grid mb-1.5">
+                            <div>
+                                <div class="lbl mb-1">CODE Size</div>
+                                <input type="range" id="code-size" min="10" max="100" value="32">
+                            </div>
+                            <div>
+                                <div class="lbl mb-1">CODE Gap</div>
+                                <input type="range" id="gap-qr-code" min="-80" max="100" value="20">
+                            </div>
+                        </div>
+                        <div class="font-row">
+                            <div class="dd font-dd" data-dd="code-font">
+                                <div class="dd-btn field rounded-lg font-bold">
+                                    <span class="dd-label">Arial</span>
+                                    <svg class="dd-chev h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 9l6 6 6-6"/></svg>
+                                </div>
+                                <div class="dd-menu font-menu"></div>
+                                <select id="code-font" class="hidden"></select>
+                            </div>
+                            <div class="fx-group">
+                                <button type="button" class="fx-btn" data-fx="bold" data-target="code" title="Bold"><span class="fx-b">B</span></button>
+                                <button type="button" class="fx-btn" data-fx="italic" data-target="code" title="Italic"><span class="fx-i">I</span></button>
+                                <button type="button" class="fx-btn" data-fx="underline" data-target="code" title="Underline"><span class="fx-u">U</span></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Caption typography -->
+                    <div class="tool">
+                        <div class="tool-grid mb-1.5">
+                            <div>
+                                <div class="lbl mb-1">Caption Size</div>
+                                <input type="range" id="caption-size" min="10" max="80" value="22">
+                            </div>
+                            <div>
+                                <div class="lbl mb-1">Caption Gap</div>
+                                <input type="range" id="gap-code-caption" min="-80" max="100" value="15">
+                            </div>
+                        </div>
+                        <div class="font-row">
+                            <div class="dd font-dd" data-dd="caption-font">
+                                <div class="dd-btn field rounded-lg font-bold">
+                                    <span class="dd-label">Arial</span>
+                                    <svg class="dd-chev h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M6 9l6 6 6-6"/></svg>
+                                </div>
+                                <div class="dd-menu font-menu"></div>
+                                <select id="caption-font" class="hidden"></select>
+                            </div>
+                            <div class="fx-group">
+                                <button type="button" class="fx-btn" data-fx="bold" data-target="caption" title="Bold"><span class="fx-b">B</span></button>
+                                <button type="button" class="fx-btn" data-fx="italic" data-target="caption" title="Italic"><span class="fx-i">I</span></button>
+                                <button type="button" class="fx-btn" data-fx="underline" data-target="caption" title="Underline"><span class="fx-u">U</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <main class="d-preview">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start" id="designer-preview-grid"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const fileInput = document.getElementById('file-input'), dropZone = document.getElementById('drop-zone'), dataBody = document.getElementById('data-body'), actionButtons = document.getElementById('actions');
+        let tableData = [];
+
+        // Theme Setup
+        document.getElementById('theme-selector').addEventListener('change', (e) => {
+            document.body.setAttribute('data-theme', e.target.value);
+        });
+
+        // ============================================================
+        // MOUSE-REACTIVE PARTICLE FIELD
+        // Floating particles drift slowly; near the cursor they get pushed
+        // away, and close pairs are linked with faint lines (constellation).
+        // Colors follow the active theme accents.
+        // ============================================================
+        // ============================================================
+        // ANTIGRAVITY-STYLE PARTICLE FIELD
+        // Tiny dash/speck particles drift slowly upward (like rising sparks),
+        // twinkle in and out, and get gently pushed by the cursor. Colours are
+        // theme-specific: cool electric blues on dark, soft indigo/violet on light.
+        // ============================================================
+        (function particles() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            let W, H, parts = [], DPR = Math.min(window.devicePixelRatio || 1, 2);
+            const mouse = { x: -9999, y: -9999 };
+            const COUNT = () => Math.min(160, Math.floor(window.innerWidth * window.innerHeight / 9000));
+
+            // Per-theme palettes (Antigravity look = electric blues/cyans on dark)
+            const PALETTES = {
+                light:    ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd'],
+                dark:     ['#3b82f6', '#60a5fa', '#22d3ee', '#818cf8'],
+                gradient: ['#fde047', '#f0abfc', '#5eead4', '#ffffff']
+            };
+            function palette() { return PALETTES[document.body.getAttribute('data-theme')] || PALETTES.light; }
+            let COLORS = palette();
+
+            function resize() {
+                W = window.innerWidth; H = window.innerHeight;
+                canvas.width = W * DPR; canvas.height = H * DPR;
+                canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+                ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+            }
+            function spawn(i) {
+                return {
+                    x: Math.random() * W,
+                    y: Math.random() * H,
+                    len: Math.random() * 9 + 3,           // dash length
+                    w: Math.random() < 0.35 ? 2 : 1,      // some fatter
+                    vy: -(Math.random() * 0.5 + 0.18),    // rising
+                    vx: (Math.random() - 0.5) * 0.25,     // slight lateral drift
+                    tw: Math.random() * Math.PI * 2,      // twinkle phase
+                    tws: Math.random() * 0.03 + 0.008,    // twinkle speed
+                    base: Math.random() * 0.5 + 0.35,     // base opacity
+                    c: COLORS[i % COLORS.length]
+                };
+            }
+            function makeParts() {
+                const n = COUNT(); parts = [];
+                for (let i = 0; i < n; i++) parts.push(spawn(i));
+            }
+            window.addEventListener('resize', () => { resize(); makeParts(); });
+            window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+            window.addEventListener('mouseout', () => { mouse.x = -9999; mouse.y = -9999; });
+            const themeObserver = new MutationObserver(() => { COLORS = palette(); parts.forEach((p, i) => p.c = COLORS[i % COLORS.length]); });
+            themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+
+            function tick() {
+                ctx.clearRect(0, 0, W, H);
+                ctx.lineCap = 'round';
+                for (let i = 0; i < parts.length; i++) {
+                    const p = parts[i];
+                    // gentle cursor push
+                    const dx = p.x - mouse.x, dy = p.y - mouse.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < 120 && dist > 0) {
+                        const f = (120 - dist) / 120;
+                        p.x += (dx / dist) * f * 1.4;
+                        p.y += (dy / dist) * f * 1.4;
+                    }
+                    p.x += p.vx; p.y += p.vy;
+                    p.tw += p.tws;
+                    // recycle when it drifts off the top (respawn at bottom)
+                    if (p.y < -12) { Object.assign(p, spawn(i)); p.y = H + 8; }
+                    if (p.x < -12) p.x = W + 8; if (p.x > W + 12) p.x = -8;
+                    // twinkle: opacity oscillates
+                    const alpha = p.base * (0.55 + 0.45 * Math.sin(p.tw));
+                    ctx.globalAlpha = alpha;
+                    ctx.strokeStyle = p.c;
+                    ctx.lineWidth = p.w;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p.x - p.vx * p.len * 2.2, p.y - p.vy * p.len * 2.2);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(tick);
+            }
+            resize(); makeParts(); tick();
+        })();
+
+        // ============================================================
+        // FONT PICKER + B/I/U STYLE STATE
+        // System fonts only (zero download, works fully offline on the
+        // restricted railway network). Each entry: label + CSS font stack.
+        // A generic fallback keeps text rendering if a font isn't installed.
+        // ============================================================
+        const FONTS = [
+            { name: 'Calibri',            stack: "Calibri, Carlito, 'Segoe UI', sans-serif" },
+            { name: 'Arial',              stack: "Arial, 'Helvetica Neue', Helvetica, sans-serif" },
+            { name: 'Helvetica',          stack: "'Helvetica Neue', Helvetica, Arial, sans-serif" },
+            { name: 'Segoe UI',           stack: "'Segoe UI', Tahoma, sans-serif" },
+            { name: 'Verdana',            stack: "Verdana, Geneva, sans-serif" },
+            { name: 'Tahoma',             stack: "Tahoma, Geneva, sans-serif" },
+            { name: 'Trebuchet MS',       stack: "'Trebuchet MS', Tahoma, sans-serif" },
+            { name: 'Century Gothic',     stack: "'Century Gothic', 'Apple Gothic', sans-serif" },
+            { name: 'Franklin Gothic',    stack: "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif" },
+            { name: 'Gill Sans',          stack: "'Gill Sans', 'Gill Sans MT', Calibri, sans-serif" },
+            { name: 'Candara',            stack: "Candara, Calibri, sans-serif" },
+            { name: 'Corbel',             stack: "Corbel, 'Lucida Grande', sans-serif" },
+            { name: 'Lucida Sans',        stack: "'Lucida Sans Unicode', 'Lucida Grande', sans-serif" },
+            { name: 'Impact',             stack: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" },
+            { name: 'Arial Black',        stack: "'Arial Black', Gadget, sans-serif" },
+            { name: 'Bahnschrift',        stack: "Bahnschrift, 'DIN Alternate', sans-serif" },
+            { name: 'Times New Roman',    stack: "'Times New Roman', Times, serif" },
+            { name: 'Georgia',            stack: "Georgia, 'Times New Roman', serif" },
+            { name: 'Garamond',           stack: "Garamond, 'Times New Roman', serif" },
+            { name: 'Cambria',            stack: "Cambria, Georgia, serif" },
+            { name: 'Book Antiqua',       stack: "'Book Antiqua', 'Palatino Linotype', Palatino, serif" },
+            { name: 'Palatino',           stack: "'Palatino Linotype', 'Book Antiqua', Palatino, serif" },
+            { name: 'Consolas',           stack: "Consolas, 'Courier New', monospace" },
+            { name: 'Courier New',        stack: "'Courier New', Courier, monospace" },
+            { name: 'Lucida Console',     stack: "'Lucida Console', Monaco, monospace" },
+            { name: 'Cascadia Code',      stack: "'Cascadia Code', 'Cascadia Mono', Consolas, monospace" },
+            { name: 'Comic Sans MS',      stack: "'Comic Sans MS', 'Comic Sans', cursive" },
+            { name: 'Segoe Print',        stack: "'Segoe Print', 'Bradley Hand', cursive" },
+            { name: 'Segoe Script',       stack: "'Segoe Script', 'Brush Script MT', cursive" },
+            { name: 'Brush Script',       stack: "'Brush Script MT', 'Segoe Script', cursive" }
+        ];
+        // Per-target font stack + B/I/U flags. Defaults keep CODE=Arial, Caption=Arial.
+        const fontState = {
+            code:    { stack: FONTS[1].stack, bold: true, italic: false, underline: false },
+            caption: { stack: FONTS[1].stack, bold: true, italic: false, underline: false }
+        };
+        // Build the option lists inside each font dropdown, each previewing its own font.
+        (function populateFontMenus() {
+            [['code-font', 1], ['caption-font', 1]].forEach(([id, defIdx]) => {
+                const dd = document.querySelector(`.dd[data-dd="${id}"]`);
+                const menu = dd.querySelector('.dd-menu');
+                const sel = dd.querySelector('select');
+                FONTS.forEach((f, i) => {
+                    const opt = document.createElement('div');
+                    opt.className = 'dd-opt' + (i === defIdx ? ' sel' : '');
+                    opt.dataset.val = f.stack;
+                    opt.textContent = f.name;
+                    opt.style.fontFamily = f.stack;
+                    menu.appendChild(opt);
+                    const o = document.createElement('option');
+                    o.value = f.stack; o.textContent = f.name;
+                    if (i === defIdx) o.selected = true;
+                    sel.appendChild(o);
+                });
+            });
+        })();
+
+        // ============================================================
+        // ANIMATED CUSTOM DROPDOWNS
+        // Each .dd wraps a hidden native <select> (unchanged IDs) so all
+        // existing logic keeps reading .value. Clicking an option updates
+        // the label, the .sel highlight, and fires the select's change event.
+        // ============================================================
+        (function dropdowns() {
+            document.querySelectorAll('.dd').forEach(dd => {
+                const btn = dd.querySelector('.dd-btn');
+                const label = dd.querySelector('.dd-label');
+                const sel = dd.querySelector('select');
+                const menu = dd.querySelector('.dd-menu');
+                const isFontMenu = menu && menu.classList.contains('font-menu');
+                // Font-menu labels preview in their own font.
+                if (isFontMenu) {
+                    const selOpt = dd.querySelector('.dd-opt.sel');
+                    if (selOpt) label.style.fontFamily = selOpt.dataset.val;
+                }
+                // Fixed-positioned font menu: anchor to the button, flip up if it would
+                // overflow the viewport bottom. Keeps it above the panel's scroll clip.
+                const placeMenu = () => {
+                    if (!isFontMenu) return;
+                    const r = btn.getBoundingClientRect();
+                    const menuW = 210, mh = 230, pad = 8;
+                    // Horizontal: align to button's left, but keep fully on-screen.
+                    let left = r.left;
+                    if (left + menuW > window.innerWidth - pad) left = window.innerWidth - menuW - pad;
+                    if (left < pad) left = pad;
+                    menu.style.left = left + 'px';
+                    menu.style.width = menuW + 'px';
+                    // Vertical: prefer below, flip above if not enough room below.
+                    const below = window.innerHeight - r.bottom;
+                    if (below < mh + 12) {
+                        menu.style.top = 'auto';
+                        menu.style.bottom = (window.innerHeight - r.top + 7) + 'px';
+                    } else {
+                        menu.style.bottom = 'auto';
+                        menu.style.top = (r.bottom + 7) + 'px';
+                    }
+                };
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const wasOpen = dd.classList.contains('open');
+                    document.querySelectorAll('.dd.open').forEach(o => o.classList.remove('open'));
+                    if (!wasOpen) {
+                        dd.classList.add('open');
+                        placeMenu();
+                        // stagger the option entrance
+                        dd.querySelectorAll('.dd-opt').forEach((o, i) => { o.style.animationDelay = (i * 0.04) + 's'; });
+                    }
+                });
+                dd.querySelectorAll('.dd-opt').forEach(opt => {
+                    opt.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        dd.querySelectorAll('.dd-opt').forEach(o => o.classList.remove('sel'));
+                        opt.classList.add('sel');
+                        label.textContent = opt.textContent;
+                        if (isFontMenu) label.style.fontFamily = opt.dataset.val;
+                        if (sel) { sel.value = opt.dataset.val; sel.dispatchEvent(new Event('change')); }
+                        dd.classList.remove('open');
+                    });
+                });
+            });
+            document.addEventListener('click', () => document.querySelectorAll('.dd.open').forEach(o => o.classList.remove('open')));
+        })();
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); processFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+
+        async function processFiles(files) {
+            for (let file of files) {
+                let qrData = null;
+                if (file.type.startsWith('image/')) {
+                    qrData = await readQRCode(file);
+                } else if (file.type === 'application/pdf') {
+                    qrData = await readPDFQRCode(file);
+                } else continue;
+
+                if (qrData) {
+                    const row = parseData(qrData, file.name, tableData.length + 1);
+                    tableData.push(row); renderRow(row);
+                }
+            }
+            if (tableData.length > 0) actionButtons.classList.remove('hidden');
+            updateRecordCount();
+        }
+
+        // Image QR
+        function readQRCode(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0);
+                        try { resolve(jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)?.data || null); } catch { resolve(null); }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // PDF QR
+        function readPDFQRCode(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    try {
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const viewport = page.getViewport({ scale: 2.0 });
+                            const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                            canvas.height = viewport.height; canvas.width = viewport.width;
+                            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+                            if (code && code.data) return resolve(code.data);
+                        }
+                        resolve(null);
+                    } catch { resolve(null); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parseData(link, fileName, index) {
+            const code = link.includes('=') ? link.split('=').pop().substring(0, 6) : "N/A", name = fileName.split('.')[0], match = name.match(/(\d{3})[-](\d{3})$/);
+            const feNo = match ? `${match[1]}/${match[2]}` : (name.includes('_') ? name.split('_').pop().replace('-','/') : "N/A"), depot = "CDO/CNB-";
+            return { srNo: index, code, feNo, depot, caption: depot + feNo, link };
+        }
+
+        function renderRow(row) {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/80 transition-colors bg-white group";
+            // Duplicate code detection: flag if this code already appears in an earlier scanned row.
+            const isDup = tableData.some(r => r !== row && r.code === row.code && row.code !== "N/A");
+            const codeCell = isDup
+                ? `<td class="p-5 font-mono text-red-600 font-extrabold border-b border-slate-100/50"><span title="Duplicate code — same QR code scanned more than once">${row.code} <span class="ml-1 inline-flex items-center rounded-full bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5">DUP</span></span></td>`
+                : `<td class="p-5 font-mono text-blue-600 font-extrabold border-b border-slate-100/50">${row.code}</td>`;
+            const safeLink = String(row.link).replace(/'/g, "\\'");
+            tr.innerHTML = `
+                <td class="p-5 text-slate-600 font-bold border-b border-slate-100/50">
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="deleteRow(${row.srNo})" title="Delete this entry" class="delete-row-btn shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors border border-transparent hover:border-red-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                        <span>${row.srNo}</span>
+                    </div>
+                </td>
+                ${codeCell}
+                <td class="p-5 text-slate-700 font-medium border-b border-slate-100/50">${row.feNo}</td>
+                <td class="p-5 text-slate-700 font-medium border-b border-slate-100/50">${row.depot}</td>
+                <td class="p-5 font-extrabold text-slate-900 border-b border-slate-100/50">${row.caption}</td>
+                <td class="p-5 text-[11px] text-slate-400 font-medium border-b border-slate-100/50">
+                    <div class="flex items-center gap-2">
+                        <span class="truncate max-w-[150px]" title="${row.link}">${row.link}</span>
+                        <button type="button" onclick="copyLink(this, '${safeLink}')" title="Copy link" class="copy-link-btn shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors border border-transparent hover:border-indigo-200">
+                            <svg class="copy-ico w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                </td>
+            `;
+            dataBody.appendChild(tr);
+        }
+
+        // Copy a row's link to the clipboard and give quick visual feedback (checkmark).
+        function copyLink(btn, link) {
+            const done = () => {
+                const ico = btn.querySelector('.copy-ico');
+                const prev = ico.innerHTML;
+                ico.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+                btn.classList.add('text-emerald-600');
+                setTimeout(() => { ico.innerHTML = prev; btn.classList.remove('text-emerald-600'); }, 1200);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link).then(done).catch(() => fallbackCopy(link, done));
+            } else { fallbackCopy(link, done); }
+        }
+        function fallbackCopy(text, cb) {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); cb && cb(); } catch (e) {}
+            document.body.removeChild(ta);
+        }
+
+        // Delete a scanned entry by its current Sr No, then renumber + re-evaluate duplicates.
+        function deleteRow(srNo) {
+            const idx = tableData.findIndex(r => r.srNo === srNo);
+            if (idx === -1) return;
+            tableData.splice(idx, 1);
+            tableData.forEach((r, i) => { r.srNo = i + 1; });
+            rerenderTable();
+            if (tableData.length === 0) actionButtons.classList.add('hidden');
+        }
+        function rerenderTable() {
+            dataBody.innerHTML = '';
+            tableData.forEach(r => renderRow(r));
+            updateRecordCount();
+        }
+        function updateRecordCount() {
+            const el = document.getElementById('record-count');
+            if (el) el.textContent = tableData.length ? `${tableData.length} record${tableData.length > 1 ? 's' : ''}` : '';
+        }
+
+        function openDesigner() { if (!tableData.length) return alert("Pehle file scan karein!"); document.getElementById('designer-overlay').style.display = 'block'; document.body.style.overflow = 'hidden'; generateDesignerCards(); updateAspectRatioUI(); syncOrientationUI(); }
+        function closeDesigner() { document.getElementById('designer-overlay').style.display = 'none'; document.body.style.overflow = ''; }
+
+        function generateDesignerCards() {
+            const grid = document.getElementById('designer-preview-grid'); grid.innerHTML = '';
+            tableData.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-3xl p-5 shadow-xl flex flex-col items-center gap-5 border border-slate-100 transition-transform hover:-translate-y-1 hover:shadow-2xl";
+                const labelId = `label-export-${index}`;
+                card.innerHTML = `
+                    <div id="${labelId}" class="label-container rounded-xl">
+                        <div id="qr-target-${index}" class="qr-wrapper" style="width: 140px;"></div>
+                        <div class="dynamic-code font-extrabold text-black tracking-tight" style="font-size: 32px; margin-top:20px; font-family:Arial, 'Helvetica Neue', Helvetica, sans-serif;">${item.code}</div>
+                        <div class="dynamic-caption font-bold text-black tracking-wide" style="font-size: 22px; margin-top:15px;">${item.caption}</div>
+                    </div>
+                    <div class="w-full flex gap-2 mt-2">
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'png')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">PNG</button>
+                        <button onclick="downloadSingle('${labelId}', '${item.caption}', 'jpg')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">JPG</button>
+                        <button onclick="downloadSVG('${index}', '${item.caption}')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200">SVG</button>
+                        <button onclick="downloadPDF('${labelId}', '${item.caption}')" class="flex-1 bg-slate-100 text-slate-700 p-2 rounded-lg font-bold text-xs hover:bg-red-50 hover:text-red-600 transition-colors border border-slate-200">PDF</button>
+                    </div>
+                `;
+                card.classList.add('d-card-enter');
+                card.style.animationDelay = (index * 0.06) + 's';
+                grid.appendChild(card);
+                new QRCode(document.getElementById(`qr-target-${index}`), { text: item.link, width: 300, height: 300, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel[qrErrorLevel] });
+            });
+            updateDynamicStyles();
+        }
+
+        // QR error-correction level (L/M/Q/H). Default H = ~30% damage recovery — best for
+        // rough field labels. Higher level = denser QR but survives more tear/dirt.
+        let qrErrorLevel = 'H';
+        const EC_INFO = { L: 'L · ~7% recovery', M: 'M · ~15% recovery', Q: 'Q · ~25% recovery', H: 'H · ~30% recovery' };
+        function setErrorCorrection(level) {
+            qrErrorLevel = level;
+            document.querySelectorAll('.ec-btn').forEach(b => b.classList.toggle('active-ec', b.dataset.ec === level));
+            const info = document.getElementById('ec-val'); if (info) info.textContent = EC_INFO[level];
+            generateDesignerCards(); // re-render QRs at the new correction level
+        }
+
+        // Dimensions Logic
+        const dimWidth = document.getElementById('dim-width'), dimHeight = document.getElementById('dim-height'), dimUnit = document.getElementById('dim-unit'), aspectLock = document.getElementById('aspect-lock');
+        let currentRatio = parseFloat(dimWidth.value) / parseFloat(dimHeight.value);
+
+        dimWidth.addEventListener('input', () => {
+            if(aspectLock.checked && dimWidth.value) dimHeight.value = (parseFloat(dimWidth.value) / currentRatio).toFixed(1);
+            updateAspectRatioUI();
+        });
+        dimHeight.addEventListener('input', () => {
+            if(aspectLock.checked && dimHeight.value) dimWidth.value = (parseFloat(dimHeight.value) * currentRatio).toFixed(1);
+            updateAspectRatioUI();
+        });
+        aspectLock.addEventListener('change', () => { if(aspectLock.checked) currentRatio = parseFloat(dimWidth.value) / parseFloat(dimHeight.value); });
+
+        function updateAspectRatioUI() {
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373;
+            document.querySelectorAll('.label-container').forEach(el => { el.style.aspectRatio = `${w} / ${h}`; });
+        }
+
+        // Unit change doesn't alter the w/h ratio, but export scale & PDF size depend
+        // on it — refresh the preview aspect so everything stays in sync.
+        dimUnit.addEventListener('change', updateAspectRatioUI);
+
+        // ---- Vertical / Horizontal orientation toggle ----
+        // 'portrait' => height is the long side; 'landscape' => width is the long side.
+        // Swaps the two dimension values when needed, keeps the ratio lock consistent,
+        // and re-syncs the live preview.
+        function setOrientation(mode) {
+            let w = parseFloat(dimWidth.value) || 0, h = parseFloat(dimHeight.value) || 0;
+            if (mode === 'portrait' && w > h) { [w, h] = [h, w]; }
+            if (mode === 'landscape' && h > w) { [w, h] = [h, w]; }
+            dimWidth.value = w; dimHeight.value = h;
+            currentRatio = w / h;
+            document.getElementById('orient-portrait').classList.toggle('active-orient', mode === 'portrait');
+            document.getElementById('orient-landscape').classList.toggle('active-orient', mode === 'landscape');
+            updateAspectRatioUI();
+        }
+        // Reflect the current dimensions on the toggle (called when designer opens).
+        function syncOrientationUI() {
+            let w = parseFloat(dimWidth.value) || 0, h = parseFloat(dimHeight.value) || 0;
+            const isLandscape = w > h;
+            document.getElementById('orient-portrait').classList.toggle('active-orient', !isLandscape);
+            document.getElementById('orient-landscape').classList.toggle('active-orient', isLandscape);
+        }
+
+        function getExportScaleFactor() {
+            let w = parseFloat(dimWidth.value) || 280, unit = dimUnit.value, pxWidth = w;
+            if(unit === 'cm') pxWidth = w * 37.7952755906;
+            if(unit === 'mm') pxWidth = w * 3.7795275591;
+            if(unit === 'in') pxWidth = w * 96;
+            let scale = pxWidth / 280; // 280 is the base CSS width of .label-container
+            // Enforce a minimum resolution so QR/text export crisp black (no gray/blur),
+            // and cap it so huge dimensions don't blow up memory.
+            if (scale < 4) scale = 4;
+            if (scale > 15) scale = 15;
+            return scale;
+        }
+
+        // Physical label size in millimetres, derived from Designer dimension fields.
+        // PDF pages use this so print comes out exactly 1:1 (no shift, no auto-resize).
+        function getLabelSizeMM() {
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373, unit = dimUnit.value;
+            const toMM = { mm: 1, cm: 10, in: 25.4, px: 25.4 / 96 }; // px assumes 96 dpi
+            return { w: w * toMM[unit], h: h * toMM[unit] };
+        }
+
+        // Live Styling
+        const controls = ['code-size', 'gap-qr-code', 'caption-size', 'gap-code-caption', 'border-width', 'border-radius', 'qr-size-slider', 'vpos-slider'];
+        controls.forEach(id => document.getElementById(id).addEventListener('input', updateDynamicStyles));
+
+        // Font pickers: update the target's font stack, then restyle live.
+        document.getElementById('code-font').addEventListener('change', (e) => { fontState.code.stack = e.target.value; updateDynamicStyles(); });
+        document.getElementById('caption-font').addEventListener('change', (e) => { fontState.caption.stack = e.target.value; updateDynamicStyles(); });
+        // B / I / U toggles (MS-Word-like). Each button flips one flag on its target.
+        document.querySelectorAll('.fx-btn').forEach(btn => {
+            const target = btn.dataset.target, fx = btn.dataset.fx;
+            const key = fx === 'bold' ? 'bold' : fx === 'italic' ? 'italic' : 'underline';
+            if (fontState[target][key]) btn.classList.add('on');
+            btn.addEventListener('click', () => {
+                fontState[target][key] = !fontState[target][key];
+                btn.classList.toggle('on', fontState[target][key]);
+                updateDynamicStyles();
+            });
+        });
+
+        // Single source of truth for label layout, in the base 280px coordinate space
+        // (same space as the SVG viewBox and the CSS width of .label-container).
+        // Everything — preview, html2canvas export, and SVG — uses THESE numbers, so
+        // all three render identically. Gaps are edge-to-edge and may go negative (overlap).
+        function computeLayout() {
+            const qrS   = parseFloat(document.getElementById('qr-size-slider').value) || 140;
+            const cSize = parseFloat(document.getElementById('code-size').value) || 32;
+            const capSize = parseFloat(document.getElementById('caption-size').value) || 22;
+            const qGap  = parseFloat(document.getElementById('gap-qr-code').value) || 0;
+            const capGap = parseFloat(document.getElementById('gap-code-caption').value) || 0;
+            const vpos  = parseFloat(document.getElementById('vpos-slider').value) || 0;
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373;
+            const containerH = 280 * (h / w);          // base-space height (280 wide)
+            const total = qrS + qGap + cSize + capGap + capSize;
+            const startY = (containerH - total) / 2 + vpos;   // vertical centering + user nudge
+            return {
+                qrS, cSize, capSize, containerH,
+                qrTop:   startY,
+                codeTop: startY + qrS + qGap,
+                capTop:  startY + qrS + qGap + cSize + capGap
+            };
+        }
+
+        function updateDynamicStyles() {
+            const cSize = document.getElementById('code-size').value, qGap = document.getElementById('gap-qr-code').value, capSize = document.getElementById('caption-size').value, capGap = document.getElementById('gap-code-caption').value, bWidth = document.getElementById('border-width').value, bRadius = document.getElementById('border-radius').value, qrS = document.getElementById('qr-size-slider').value;
+
+            document.getElementById('bw-val').innerText = bWidth + 'px';
+            document.getElementById('br-val').innerText = bRadius + 'px';
+            document.getElementById('qr-size-val').innerText = qrS + 'px';
+            document.getElementById('vpos-val').innerText = document.getElementById('vpos-slider').value + 'px';
+
+            const L = computeLayout();
+            // .label-container CSS width is fixed at 280px, so base-280 coords == real px.
+            // Use px directly (font-size % would be relative to parent font, not width — a bug).
+            document.querySelectorAll('.label-container').forEach(el => {
+                el.style.borderWidth = bWidth + 'px'; el.style.borderRadius = bRadius + 'px';
+                el.style.position = 'relative'; el.style.padding = '0'; el.style.display = 'block';
+            });
+            document.querySelectorAll('.qr-wrapper').forEach(el => {
+                el.style.position = 'absolute'; el.style.left = '50%';
+                el.style.top = L.qrTop + 'px'; el.style.width = L.qrS + 'px';
+                el.style.transform = 'translateX(-50%)';
+            });
+            document.querySelectorAll('.dynamic-code').forEach(el => {
+                el.style.position = 'absolute'; el.style.left = '0'; el.style.width = '100%'; el.style.textAlign = 'center';
+                el.style.top = L.codeTop + 'px'; el.style.fontSize = L.cSize + 'px'; el.style.lineHeight = '1'; el.style.margin = '0';
+                applyFont(el, fontState.code);
+            });
+            document.querySelectorAll('.dynamic-caption').forEach(el => {
+                el.style.position = 'absolute'; el.style.left = '0'; el.style.width = '100%'; el.style.textAlign = 'center';
+                el.style.top = L.capTop + 'px'; el.style.fontSize = L.capSize + 'px'; el.style.lineHeight = '1'; el.style.margin = '0';
+                applyFont(el, fontState.caption);
+            });
+        }
+
+        // Apply a target's font stack + B/I/U flags to a text element (used by preview
+        // and, since exports capture this same DOM, by PNG/JPG/PDF as well).
+        function applyFont(el, st) {
+            el.style.fontFamily = st.stack;
+            el.style.fontWeight = st.bold ? '700' : '400';
+            el.style.fontStyle = st.italic ? 'italic' : 'normal';
+            el.style.textDecoration = st.underline ? 'underline' : 'none';
+        }
+
+        // Downloads
+
+        // html2canvas renders absolutely-positioned text ~0.40*fontSize LOWER than the
+        // browser does (its line-box/baseline quirk). QR images are unaffected, so only text
+        // drifts down in exports. We compensate ONLY in the cloned capture DOM (via onclone),
+        // leaving the live preview untouched, so PNG/JPG/PDF match the preview exactly.
+        // Factor verified by headless render-diff across sizes (see project history).
+        const H2C_TEXT_FIX = 0.40;
+        function h2cOptions(extra) {
+            return Object.assign({
+                scale: getExportScaleFactor(), useCORS: true, backgroundColor: "#ffffff",
+                onclone: (doc) => {
+                    doc.querySelectorAll('.dynamic-code, .dynamic-caption').forEach(el => {
+                        const fs = parseFloat(el.style.fontSize) || 0;
+                        const top = parseFloat(el.style.top) || 0;
+                        el.style.top = (top - H2C_TEXT_FIX * fs) + 'px';
+                    });
+                }
+            }, extra || {});
+        }
+
+        async function downloadSingle(divId, fileName, format) {
+            const canvas = await html2canvas(document.getElementById(divId), h2cOptions());
+            const link = document.createElement('a'); link.download = `${fileName}.${format}`; link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0); link.click();
+        }
+
+        // Render a single label to a high-res canvas (shared by PDF export).
+        async function labelToCanvas(divId) {
+            return html2canvas(document.getElementById(divId), h2cOptions());
+        }
+
+        // Single label -> exact-size PDF (one page = one physical label).
+        async function downloadPDF(divId, fileName) {
+            const { jsPDF } = window.jspdf;
+            const { w, h } = getLabelSizeMM();
+            const canvas = await labelToCanvas(divId);
+            const pdf = new jsPDF({ orientation: w > h ? 'landscape' : 'portrait', unit: 'mm', format: [w, h] });
+            pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, w, h);
+            pdf.save(`${fileName}.pdf`);
+        }
+
+        // All labels -> one PDF, each on its own exact-size page.
+        async function exportPdfSingle() {
+            const { jsPDF } = window.jspdf;
+            const { w, h } = getLabelSizeMM();
+            const labels = document.querySelectorAll('.label-container');
+            let pdf = null;
+            for (let i = 0; i < labels.length; i++) {
+                const canvas = await html2canvas(labels[i], h2cOptions());
+                const img = canvas.toDataURL('image/png', 1.0);
+                if (!pdf) pdf = new jsPDF({ orientation: w > h ? 'landscape' : 'portrait', unit: 'mm', format: [w, h] });
+                else pdf.addPage([w, h], w > h ? 'landscape' : 'portrait');
+                pdf.addImage(img, 'PNG', 0, 0, w, h);
+            }
+            pdf.save(`Labels_${tableData.length}.pdf`);
+        }
+
+        // All labels -> A4 sheet(s), tiled in a grid at exact physical size.
+        async function exportPdfA4() {
+            const { jsPDF } = window.jspdf;
+            const { w, h } = getLabelSizeMM();
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageW = 210, pageH = 297, margin = 8, gap = 4;
+            let x = margin, y = margin;
+            const labels = document.querySelectorAll('.label-container');
+            for (let i = 0; i < labels.length; i++) {
+                if (x + w > pageW - margin) { x = margin; y += h + gap; }      // wrap to next row
+                if (y + h > pageH - margin) { pdf.addPage(); x = margin; y = margin; } // new page
+                const canvas = await html2canvas(labels[i], h2cOptions());
+                pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', x, y, w, h);
+                x += w + gap;
+            }
+            pdf.save(`Labels_A4_${tableData.length}.pdf`);
+        }
+
+        function downloadSVG(index, fileName) {
+            const qrCanvas = document.querySelector(`#qr-target-${index} canvas`), bRadius = document.getElementById('border-radius').value, bWidth = document.getElementById('border-width').value;
+            let w = parseFloat(dimWidth.value) || 280, h = parseFloat(dimHeight.value) || 373, unit = dimUnit.value;
+            const L = computeLayout();                 // same math as preview & PNG
+            const internalHeight = L.containerH;       // base-280 space height
+            // SVG <text> y is the alphabetic baseline. In the DOM (line-height:1) the glyph
+            // baseline sits ~1.32*fontSize below the element top. This K aligns SVG text with
+            // the preview/PNG (verified via headless render diff). See test.mjs.
+            const K = 1.32;
+            const codeBaseline = L.codeTop + K * L.cSize;
+            const capBaseline  = L.capTop + K * L.capSize;
+
+            // SVG text attributes from the same font state the preview/PNG use, so SVG matches.
+            const svgFontAttrs = (st) =>
+                `font-family="${st.stack.replace(/"/g, '&quot;')}" font-weight="${st.bold ? 'bold' : 'normal'}" font-style="${st.italic ? 'italic' : 'normal'}" text-decoration="${st.underline ? 'underline' : 'none'}"`;
+
+            const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}${unit}" height="${h}${unit}" viewBox="0 0 280 ${internalHeight}" style="background:white"><rect x="${bWidth/2}" y="${bWidth/2}" width="${280-bWidth}" height="${internalHeight-bWidth}" rx="${bRadius}" ry="${bRadius}" fill="white" stroke="black" stroke-width="${bWidth}"/><image x="${140 - L.qrS/2}" y="${L.qrTop}" width="${L.qrS}" height="${L.qrS}" href="${qrCanvas.toDataURL()}"/><text x="140" y="${codeBaseline}" ${svgFontAttrs(fontState.code)} font-size="${L.cSize}" text-anchor="middle" fill="black">${tableData[index].code}</text><text x="140" y="${capBaseline}" ${svgFontAttrs(fontState.caption)} font-size="${L.capSize}" text-anchor="middle" fill="black">${tableData[index].caption}</text></svg>`;
+            const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([svgContent], {type: 'image/svg+xml'})); link.download = `${fileName}.svg`; link.click();
+        }
+
+        async function downloadAllZip() {
+            const format = document.getElementById('bulk-format').value, btn = event.target;
+            // Route PDF options to their dedicated exporters (not a ZIP).
+            if (format === 'pdf-single' || format === 'pdf-a4') {
+                const old = btn.innerText; btn.innerText = "Processing..."; btn.disabled = true;
+                try { format === 'pdf-single' ? await exportPdfSingle() : await exportPdfA4(); }
+                finally { btn.innerText = old; btn.disabled = false; }
+                return;
+            }
+            const zip = new JSZip(), scale = getExportScaleFactor(), labels = document.querySelectorAll('.label-container');
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...`;
+            btn.disabled = true;
+            for(let i=0; i < labels.length; i++) {
+                const canvas = await html2canvas(labels[i], h2cOptions());
+                zip.file(`${tableData[i].caption}.${format}`, canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`, 1.0).split(',')[1], {base64: true});
+            }
+            zip.generateAsync({type:"blob"}).then(c => { const l = document.createElement('a'); l.href = URL.createObjectURL(c); l.download = `Labels_Export_${Date.now()}.zip`; l.click(); btn.innerText = "Export All"; btn.disabled = false; });
+        }
+
+        // ---- Direct browser print at exact physical size (fixes shifting/mis-alignment) ----
+        // mode: 'single' = one label per exact-size page | 'a4' = grid on A4 sheet
+        function printLabels(mode) {
+            const { w, h } = getLabelSizeMM();
+
+            // Set the physical page size so the printer renders 1:1 with zero margin.
+            let pageStyle = document.getElementById('dynamic-print-style');
+            if (!pageStyle) { pageStyle = document.createElement('style'); pageStyle.id = 'dynamic-print-style'; document.head.appendChild(pageStyle); }
+            pageStyle.innerHTML = (mode === 'a4')
+                ? `@page { size: A4; margin: 8mm; }`
+                : `@page { size: ${w}mm ${h}mm; margin: 0; }`;
+
+            // Build a clean print area by cloning the designed labels (keeps all live styling).
+            let area = document.getElementById('print-area');
+            if (!area) { area = document.createElement('div'); area.id = 'print-area'; document.body.appendChild(area); }
+            area.className = (mode === 'a4') ? 'a4-grid' : '';
+            area.innerHTML = '';
+            document.querySelectorAll('.label-container').forEach(lbl => {
+                const wrap = document.createElement('div');
+                wrap.className = 'print-label';
+                const clone = lbl.cloneNode(true);
+                clone.style.width = w + 'mm';
+                clone.style.height = h + 'mm';
+                clone.style.aspectRatio = 'auto';
+                // A cloned <canvas> is blank (bitmap isn't copied). Replace each cloned
+                // canvas with an <img> baked from the original canvas so the QR prints.
+                const srcCanvases = lbl.querySelectorAll('canvas');
+                clone.querySelectorAll('canvas').forEach((c, ci) => {
+                    if (!srcCanvases[ci]) return;
+                    const img = document.createElement('img');
+                    img.src = srcCanvases[ci].toDataURL('image/png');
+                    img.style.cssText = c.style.cssText + ';width:100%;height:auto;';
+                    c.replaceWith(img);
+                });
+                wrap.appendChild(clone);
+                area.appendChild(wrap);
+            });
+
+            window.print();
+        }
+
+        document.getElementById('export-excel').addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(tableData.map(i => ({ "Sr No": i.srNo, "CODE": i.code, "FE_No": i.feNo, "Depot": i.depot, "Caption": i.caption, "Link": i.link })));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Data");
+            const d = new Date(), ds = `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
+            XLSX.writeFile(wb, `FE_QR_Report_${ds}.xlsx`);
+        });
+    </script>
+</body>
+</html>
